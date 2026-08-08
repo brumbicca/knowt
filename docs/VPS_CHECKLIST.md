@@ -2,6 +2,17 @@
 
 Dominio já reservado. **VPS ainda não existe.** Preencher ao provisionar.
 
+## Feito 2026-08-08 (bootstrap)
+
+- [x] VPS Ubuntu 24.04 · IP `179.198.118.171` · hostname `knowt`
+- [x] SSH chave `id_ed25519_knowt`
+- [x] Firewall Hostinger grupo `knowt` (SSH/22)
+- [x] Clone `https://github.com/brumbicca/knowt.git` → `/root/knowt`
+- [x] Pasta dados `/root/knowt-data`
+- [ ] DNS domínio knowt → IP
+- [ ] Firewall Accept HTTP/80 e HTTPS/443 (quando houver web)
+- [ ] Mongo / API / Hermes
+
 ## Antes de comprar / criar
 
 - [ ] Escolher provider (ex.: Hostinger VPS, como Fiesta, ou outro)

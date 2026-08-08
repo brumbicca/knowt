@@ -49,6 +49,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | GitHub | https://github.com/brumbicca/knowt |
 | OS | Ubuntu 24.04.4 LTS · KVM 2 (~8 GB RAM · 2 vCPU) |
 | Firewall Hostinger | grupo `knowt` Ativo · Accept SSH/22 (+ Drop Any) |
+| Deploy path | `/root/knowt` (clone GitHub · HEAD bootstrap 2026-08-08) |
+| Data path | `/root/knowt-data` |
 | Supervisor / serviços | _TBD_ |
 
 ### O que enviar ao agente após criar VPS + GitHub
@@ -62,7 +64,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 ## Próximos passos técnicos (ordem)
 
 1. ~~Visão + scaffold repo~~  
-2. ~~Provisionar VPS~~ · DNS knowt ainda TBD · checklist `docs/VPS_CHECKLIST.md`  
+2. ~~Provisionar VPS~~ · ~~bootstrap `/root/knowt`~~ · DNS knowt ainda TBD  
 3. MVP 0 código: cofre + source registry + discovery stub + gateway chat enforcement  
 4. Extrair/adaptar módulos do mapa de herança (sem S1 sync)  
 5. Piloto Tiny no knowt (narrativa própria; token/credencial knowt, não “muleta S1” opaca)  
