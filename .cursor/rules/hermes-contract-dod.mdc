@@ -1,0 +1,23 @@
+# knowt — Hermes / Agent Gateway
+
+O Hermes do **knowt** não descobre features sozinho. Consome só o **contrato**:
+bridge path + catálogo (+ SOUL quando a pergunta for natural).
+
+## Quando aplica
+
+Mudança que expõe dados consultáveis no chat / Insights / gateway knowt.
+
+## Definition of Done
+
+1. Path estável no bridge (se aplicável)
+2. Entrada `live` no catálogo com descrição e exemplos
+3. SOUL / atalho se pergunta frequente ou ambígua — reaplicar no Hermes **knowt**
+4. Smoke via chat do knowt alinhado ao contrato
+5. Teste unitário quando houver lógica nova de path/catálogo
+
+## Proibido
+
+- Publicar UI/insight com número novo sem catálogo
+- Assumir que o utilizador “ensina” o Hermes no chat informal
+- Inventar paths no SOUL que o bridge não implementa
+- Usar o Hermes ou SOUL da **Fiesta** para o knowt

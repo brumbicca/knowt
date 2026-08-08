@@ -1,0 +1,8 @@
+# knowt — responsabilidades do agente
+
+- Executar o que for possível na sessão (testes, SSH knowt quando existir, logs).
+- **Não** modificar `c:\Apps\fiestaup` para implementar features do knowt (excepto docs de visão partilhados acordados).
+- Preferir copiar módulos úteis do Fiesta para este repo e desacoplar.
+- Single-tenant no MVP; não construir billing multi-tenant agora.
+- Credenciais: nunca colar secrets no chat; usar env / cofre.
+- Antes de declarar piloto Tiny no knowt “pronto”: enforcement + capability + smoke chat.
