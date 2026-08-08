@@ -1,7 +1,8 @@
-"""API mínima knowt (health + registry + enforcement + pedidos Tiny)."""
+"""API mínima knowt (health + chat web + registry + pedidos Tiny)."""
 from __future__ import annotations
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from pathlib import Path
 
 from knowt import __version__
 from knowt.answers import answer_chat
@@ -23,7 +24,6 @@ from knowt.vault import resolve_secret
 
 def _load_dotenv_into_environ(path) -> None:
     import os
-    from pathlib import Path
 
     p = Path(path)
     if not p.exists():
@@ -42,7 +42,11 @@ def create_app(settings: Settings | None = None) -> Flask:
     seed_tiny_draft(registry, org_id=settings.org_id)
     ensure_tiny_capability_slots(registry, "tinyerp")
 
-    app = Flask("knowt")
+    app = Flask(
+        "knowt",
+        template_folder=str(Path(__file__).resolve().parent / "templates"),
+    )
+    app.secret_key = settings.secret_key
     app.config["KNOWT_SETTINGS"] = settings
     app.config["KNOWT_REGISTRY"] = registry
 
@@ -67,6 +71,61 @@ def create_app(settings: Settings | None = None) -> Flask:
             )
         return None
 
+    def _chat_logged_in() -> bool:
+        if not settings.chat_password:
+            return settings.env != "production"
+        return bool(session.get("knowt_chat_ok"))
+
+    @app.get("/")
+    def home():
+        return render_template(
+            "chat.html",
+            logged_in=_chat_logged_in(),
+            login_error=None,
+        )
+
+    @app.post("/login")
+    def login():
+        password = (request.form.get("password") or "").strip()
+        if settings.chat_password and password == settings.chat_password:
+            session["knowt_chat_ok"] = True
+            return redirect(url_for("home"))
+        return (
+            render_template(
+                "chat.html",
+                logged_in=False,
+                login_error="Senha incorrecta.",
+            ),
+            401,
+        )
+
+    @app.get("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for("home"))
+
+    @app.post("/chat")
+    def chat_web():
+        if not _chat_logged_in():
+            return jsonify({"ok": False, "message": "Faça login no chat."}), 401
+        registry.load()
+        payload = request.get_json(silent=True) or {}
+        message = (payload.get("message") or "").strip()
+        source_id = (payload.get("source_id") or "tinyerp").strip()
+        if not message:
+            return jsonify({"ok": False, "message": "Mensagem vazia."}), 400
+        result = answer_chat(registry, message=message, source_id=source_id)
+        try:
+            append_answer_audit(
+                audit_path_for(settings.data_dir),
+                message=message,
+                source_id=source_id,
+                result=result,
+            )
+        except OSError:
+            pass
+        return jsonify({"ok": True, **result})
+
     @app.get("/health")
     def health():
         return jsonify(
@@ -77,6 +136,7 @@ def create_app(settings: Settings | None = None) -> Flask:
                 "env": settings.env,
                 "org_id": settings.org_id,
                 "auth_required": bool(settings.api_token),
+                "chat": True,
             }
         )
 
@@ -141,7 +201,6 @@ def create_app(settings: Settings | None = None) -> Flask:
 
     @app.post("/v1/sources/<source_id>/capabilities/orders.list/publish")
     def publish_orders(source_id: str):
-        """Publica orders.list só após leitura OK da página 1."""
         src = registry.get(source_id)
         if not src:
             return jsonify({"ok": False, "reason_code": "SOURCE_NOT_FOUND"}), 404
@@ -171,7 +230,6 @@ def create_app(settings: Settings | None = None) -> Flask:
 
     @app.post("/v1/sources/<source_id>/capabilities/orders.detail/publish")
     def publish_orders_detail(source_id: str):
-        """Publica orders.detail só após pedido.obter OK num id amostral."""
         src = registry.get(source_id)
         if not src:
             return jsonify({"ok": False, "reason_code": "SOURCE_NOT_FOUND"}), 404

@@ -45,10 +45,9 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | SSH key | `%USERPROFILE%\.ssh\id_ed25519_knowt` (comentário `knowt-vps`) |
 | API / chat URL | https://knowt.com.br (TLS 2026-08-08) |
 | Mongo | instância própria na VPS knowt (_ainda não_) |
-| Hermes home | isolado do Fiesta (_ainda não_) |
-| GitHub | https://github.com/brumbicca/knowt |
-| OS | Ubuntu 24.04.4 LTS · KVM 2 (~8 GB RAM · 2 vCPU) |
-| Firewall Hostinger | grupo `knowt` Ativo · Accept SSH/22 (+ Drop Any) |
+| Hermes home | chat web em https://knowt.com.br (piloto); Hermes Telegram depois |
+| Chat web | login com `KNOWT_CHAT_PASSWORD` · ver `docs/BANCO.md` para dados |
+| Firewall Hostinger | grupo `knowt` · Accept 22/80/443 + Drop Any |
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
 | Tiny `orders.list` | **live** / `machine_validated` (2026-08-08) — página 1 = 100 pedidos · 3796 páginas |
 | Tiny `orders.detail` | **live** / `machine_validated` após publish (pedido.obter) |
@@ -85,8 +84,8 @@ Até lá a API fica só em loopback + Bearer `KNOWT_API_TOKEN`.
 3. ~~MVP 0 código~~ (vault, sources, discovery stub, enforcement, health) — ver `docs/MVP0.md`  
 4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~ · ~~contagem page_bounds~~ · ~~orders.detail + catálogo no chat~~  
 5. Extrair/adaptar discovery real Tiny (mais endpoints)  
-6. DNS knowt + Nginx/TLS (+ firewall 80/443 no Hostinger)  
-7. Hermes novo + SOUL/catálogo DoD  
+6. ~~DNS knowt + Nginx/TLS (+ firewall 80/443)~~  
+7. ~~Chat web piloto em knowt.com.br~~ · Hermes Telegram/WhatsApp ainda TBD  
 8. `sales.summary` / margem só com validação de negócio (não publicar cego)  
 
 ## Agente

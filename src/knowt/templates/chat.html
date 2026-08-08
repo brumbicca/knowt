@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>knowt</title>
+  <style>
+    :root {
+      --bg: #141416;
+      --panel: #1e1f24;
+      --ink: #f2efe8;
+      --muted: #9a958a;
+      --line: #2c2d33;
+      --accent: #e8a54b;
+      --ok: #7cb87c;
+      --warn: #c97b5a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(900px 400px at 10% -10%, #2a2418 0%, transparent 55%),
+        var(--bg);
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 100vh;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+      letter-spacing: -0.03em;
+      font-weight: 650;
+    }
+    header p {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem;
+    }
+    #log {
+      flex: 1;
+      min-height: 320px;
+      max-height: 55vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .msg {
+      padding: 0.75rem 0.9rem;
+      border-radius: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #2a2c34;
+      max-width: 85%;
+    }
+    .msg.bot {
+      align-self: flex-start;
+      background: #23252c;
+      border-left: 3px solid var(--accent);
+      max-width: 95%;
+    }
+    .msg.meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      border-left-color: var(--line);
+    }
+    form.row {
+      display: flex;
+      gap: 0.6rem;
+    }
+    input[type="text"], input[type="password"] {
+      flex: 1;
+      background: #121316;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 0.85rem 0.95rem;
+      font-size: 1rem;
+    }
+    button {
+      background: var(--accent);
+      color: #1a140a;
+      border: 0;
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .hint { color: var(--muted); font-size: 0.85rem; }
+    a.out { color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>knowt</h1>
+      <p>Pergunte só o que está publicado como live. Sem inventar vendas/margem.</p>
+    </header>
+
+    {% if not logged_in %}
+    <div class="card">
+      <p class="hint">Acesso do piloto (senha do chat — não é a password root).</p>
+      <form method="post" action="/login" class="row" style="margin-top:0.8rem">
+        <input type="password" name="password" placeholder="Senha do chat" required autofocus />
+        <button type="submit">Entrar</button>
+      </form>
+      {% if login_error %}<p class="hint" style="color:var(--warn)">{{ login_error }}</p>{% endif %}
+    </div>
+    {% else %}
+    <div id="log" class="card"></div>
+    <form id="ask" class="row">
+      <input id="q" type="text" placeholder="Ex.: pedidos cancelados esta semana" autocomplete="off" required />
+      <button type="submit">Perguntar</button>
+    </form>
+    <p class="hint">Exemplos: o que podes responder? · pedidos esta semana · pedido 752095868</p>
+    <a class="out" href="/logout">Sair</a>
+    <script>
+      const log = document.getElementById("log");
+      const form = document.getElementById("ask");
+      const q = document.getElementById("q");
+
+      function add(text, cls) {
+        const el = document.createElement("div");
+        el.className = "msg " + cls;
+        el.textContent = text;
+        log.appendChild(el);
+        log.scrollTop = log.scrollHeight;
+      }
+
+      add("Conectado. Só respondo com capabilities live + validadas.", "bot meta");
+
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const message = q.value.trim();
+        if (!message) return;
+        add(message, "user");
+        q.value = "";
+        form.querySelector("button").disabled = true;
+        try {
+          const res = await fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message, source_id: "tinyerp" }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            add(data.message || "Erro " + res.status, "bot");
+          } else {
+            const mode = (data.enforcement && data.enforcement.mode) || "?";
+            add(data.answer || "(sem resposta)", "bot");
+            add("modo: " + mode + (data.enforcement && data.enforcement.capability_id ? " · " + data.enforcement.capability_id : ""), "bot meta");
+          }
+        } catch (e) {
+          add("Falha de rede: " + e, "bot");
+        } finally {
+          form.querySelector("button").disabled = false;
+          q.focus();
+        }
+      });
+    </script>
+    {% endif %}
+  </div>
+</body>
+</html>
