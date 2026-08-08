@@ -31,9 +31,7 @@ def answer_chat(
 
         if period:
             d0, d1 = period.tiny_bounds()
-            counted = count_orders_in_period(
-                token, data_inicial=d0, data_final=d1, max_pages=40
-            )
+            counted = count_orders_in_period(token, data_inicial=d0, data_final=d1)
             out["data"] = {"period": period.label, **counted.to_dict()}
             if not counted.ok:
                 out["answer"] = (
@@ -41,18 +39,17 @@ def answer_chat(
                     f"({counted.reason_code}). Não invento números."
                 )
                 return out
-            trunc = (
-                f" Contagem truncada em {counted.pages_fetched} de "
-                f"{counted.total_pages} páginas (limite de segurança)."
-                if counted.truncated
-                else ""
+            how = (
+                "1ª+última página Tiny"
+                if counted.method == "page_bounds"
+                else "página única"
             )
             out["answer"] = (
                 f"Fonte `{source_id}` · `orders.list` ({enf.mode}) · período "
                 f"**{period.label}** ({d0} a {d1}): "
                 f"**{counted.total_orders}** pedido(s) "
-                f"em {counted.pages_fetched} página(s)."
-                f"{trunc} Sem valor/margem."
+                f"({how}; {counted.total_pages} página(s) no intervalo). "
+                "Sem valor/margem."
             )
             return out
 

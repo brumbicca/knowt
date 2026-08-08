@@ -169,6 +169,7 @@ class TinyOrdersCount:
     truncated: bool = False
     sample_ids: List[str] = field(default_factory=list)
     detail: str = ""
+    method: str = ""  # page_bounds | single_page
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -179,15 +180,14 @@ def count_orders_in_period(
     *,
     data_inicial: str,
     data_final: str,
-    max_pages: int = 40,
     timeout: float = 60.0,
 ) -> TinyOrdersCount:
-    """Percorre páginas no intervalo Tiny; corta em max_pages com truncated=True."""
-    total = 0
-    sample: List[str] = []
-    total_pages: Optional[int] = None
-    pages = 0
+    """Conta pedidos no intervalo sem varrer todas as páginas.
 
+    Tiny expõe ``numero_paginas``; com página cheia na 1ª e a última página,
+    total = (paginas-1)*tam_pagina_1 + contagem_ultima. Exacto se o tamanho
+    das páginas intermédias for constante (comportamento normal da API).
+    """
     first = fetch_orders_page(
         api_token,
         page=1,
@@ -205,46 +205,82 @@ def count_orders_in_period(
         )
 
     total_pages = first.total_pages or 1
-    pages = 1
-    total += first.order_count
-    sample.extend(first.order_ids[:10])
+    sample = list(first.order_ids[:10])
 
-    last_page = min(total_pages, max_pages)
-    for p in range(2, last_page + 1):
-        page = fetch_orders_page(
-            api_token,
-            page=p,
+    if total_pages <= 1:
+        return TinyOrdersCount(
+            ok=True,
+            reason_code="OK",
             data_inicial=data_inicial,
             data_final=data_final,
-            timeout=timeout,
+            total_orders=first.order_count,
+            pages_fetched=1,
+            total_pages=total_pages,
+            truncated=False,
+            sample_ids=sample,
+            detail="single_page",
+            method="single_page",
         )
-        pages += 1
-        if not page.ok:
-            return TinyOrdersCount(
-                ok=False,
-                reason_code=page.reason_code,
-                data_inicial=data_inicial,
-                data_final=data_final,
-                total_orders=total,
-                pages_fetched=pages,
-                total_pages=total_pages,
-                sample_ids=sample[:10],
-                detail=page.detail,
-            )
-        total += page.order_count
-        if len(sample) < 10:
-            sample.extend(page.order_ids[: max(0, 10 - len(sample))])
 
-    truncated = bool(total_pages and total_pages > max_pages)
+    if first.order_count <= 0:
+        return TinyOrdersCount(
+            ok=False,
+            reason_code="INCONSISTENT_PAGINATION",
+            data_inicial=data_inicial,
+            data_final=data_final,
+            pages_fetched=1,
+            total_pages=total_pages,
+            detail="total_pages>1 mas página 1 vazia",
+            method="page_bounds",
+        )
+
+    last = fetch_orders_page(
+        api_token,
+        page=total_pages,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        timeout=timeout,
+    )
+    if not last.ok:
+        return TinyOrdersCount(
+            ok=False,
+            reason_code=last.reason_code,
+            data_inicial=data_inicial,
+            data_final=data_final,
+            pages_fetched=2,
+            total_pages=total_pages,
+            sample_ids=sample,
+            detail=last.detail,
+            method="page_bounds",
+        )
+
+    if last.order_count > first.order_count:
+        return TinyOrdersCount(
+            ok=False,
+            reason_code="INCONSISTENT_PAGINATION",
+            data_inicial=data_inicial,
+            data_final=data_final,
+            pages_fetched=2,
+            total_pages=total_pages,
+            sample_ids=sample,
+            detail=(
+                f"última página ({last.order_count}) > "
+                f"tamanho da 1ª ({first.order_count})"
+            ),
+            method="page_bounds",
+        )
+
+    total = (total_pages - 1) * first.order_count + last.order_count
     return TinyOrdersCount(
         ok=True,
         reason_code="OK",
         data_inicial=data_inicial,
         data_final=data_final,
         total_orders=total,
-        pages_fetched=pages,
+        pages_fetched=2,
         total_pages=total_pages,
-        truncated=truncated,
-        sample_ids=sample[:10],
-        detail="truncated" if truncated else "full",
+        truncated=False,
+        sample_ids=sample,
+        detail="page_bounds",
+        method="page_bounds",
     )
