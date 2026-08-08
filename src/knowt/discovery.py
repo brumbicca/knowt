@@ -1,9 +1,10 @@
-"""Discovery stub — estrutura de dossiê, sem transformar hipótese em fato."""
+"""Discovery — stub + probe Tiny quando houver secret (sem publicar live)."""
 from __future__ import annotations
 
 from knowt.models import DiscoveryReport
 from knowt.sources import SourceRegistry
-from knowt.vault import VaultError, has_secret, public_ref_status
+from knowt.tiny_probe import probe_tiny_v2_orders
+from knowt.vault import VaultError, has_secret, public_ref_status, resolve_secret
 
 
 def run_discovery_stub(registry: SourceRegistry, source_id: str) -> DiscoveryReport:
@@ -17,13 +18,15 @@ def run_discovery_stub(registry: SourceRegistry, source_id: str) -> DiscoveryRep
 
     evidence: list[str] = [f"source_registered:{src.source_id}:{src.system}"]
     hypotheses: list[str] = [
-        "API ou outro canal pode existir — ainda não validado",
+        "API Tiny pode existir — validação só com probe explícito",
     ]
     blocked: list[str] = []
 
     for name, ref in (src.secret_refs or {}).items():
         st = public_ref_status(ref)
-        evidence.append(f"secret_ref:{name}:{'present' if st.get('present') else 'missing'}")
+        evidence.append(
+            f"secret_ref:{name}:{'present' if st.get('present') else 'missing'}"
+        )
         if not st.get("present"):
             blocked.append(f"SECRET_MISSING:{name}")
 
@@ -36,10 +39,38 @@ def run_discovery_stub(registry: SourceRegistry, source_id: str) -> DiscoveryRep
             blocked_reasons=blocked,
         )
 
-    # Segredos presentes ≠ compreensão. Mantém stub até pipeline real.
     evidence.append("credentials_resolvable")
+
+    if src.system == "tiny-erp" or source_id == "tinyerp":
+        ref = (src.secret_refs or {}).get("api_token") or "KNOWT_SECRET_TINY_TOKEN"
+        token = resolve_secret(ref, required=True)
+        probe = probe_tiny_v2_orders(token)
+        evidence.append(
+            "tiny_probe:ok=%s:http=%s:status=%s:reason=%s"
+            % (probe.ok, probe.http_status, probe.tinystatus, probe.reason_code)
+        )
+        if not probe.ok:
+            return DiscoveryReport(
+                source_id=source_id,
+                status="blocked",
+                evidence=evidence,
+                hypotheses=hypotheses,
+                blocked_reasons=[f"TINY_PROBE_FAILED:{probe.reason_code}"],
+            )
+        hypotheses.append(
+            "Token Tiny válido para pedidos.pesquisa — capabilities continuam "
+            "unavailable até publicação/validação de negócio"
+        )
+        return DiscoveryReport(
+            source_id=source_id,
+            status="complete",
+            evidence=evidence,
+            hypotheses=hypotheses,
+            blocked_reasons=["CAPABILITIES_NOT_PUBLISHED"],
+        )
+
     hypotheses.append(
-        "Com token presente, o passo seguinte é probe seguro da API (não implementado no MVP 0)"
+        "Com secret presente, o próximo passo é probe do sistema (não Tiny)"
     )
     return DiscoveryReport(
         source_id=source_id,
@@ -51,8 +82,7 @@ def run_discovery_stub(registry: SourceRegistry, source_id: str) -> DiscoveryRep
 
 
 def assert_no_silent_truth(report: DiscoveryReport) -> None:
-    """Gates de teste: stub/blocked não pode marcar hipóteses como validadas."""
     if report.status in ("stub", "blocked") and not report.blocked_reasons:
         raise AssertionError("relatório incompleto sem blocked_reasons")
-    _ = has_secret  # noqa: F841 — API pública reutilizável
+    _ = has_secret
     _ = VaultError
