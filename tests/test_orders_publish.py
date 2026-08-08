@@ -40,3 +40,32 @@ def test_answer_orders_when_live(tmp_path: Path, monkeypatch):
     assert out["enforcement"]["mode"] == "fact"
     assert "2 pedido" in out["answer"]
     assert out["data"]["order_count"] == 2
+
+
+def test_answer_orders_esta_semana(tmp_path: Path, monkeypatch):
+    from knowt.tiny_orders import TinyOrdersCount
+
+    monkeypatch.setenv("KNOWT_SECRET_TINY_TOKEN", "tok")
+    reg = SourceRegistry(tmp_path / "sources.json")
+    seed_tiny_draft(reg)
+    publish_orders_list_live(reg)
+    fake = TinyOrdersCount(
+        ok=True,
+        reason_code="OK",
+        data_inicial="03/08/2026",
+        data_final="08/08/2026",
+        total_orders=17,
+        pages_fetched=1,
+        total_pages=1,
+        truncated=False,
+        sample_ids=["1"],
+        detail="full",
+    )
+    with patch("knowt.answers.count_orders_in_period", return_value=fake):
+        with patch("knowt.period.today_br", return_value=__import__("datetime").date(2026, 8, 8)):
+            out = answer_chat(
+                reg, message="quantos pedidos esta semana?", source_id="tinyerp"
+            )
+    assert out["enforcement"]["mode"] == "fact"
+    assert "17" in out["answer"]
+    assert out["data"]["total_orders"] == 17

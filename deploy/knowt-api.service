@@ -1,0 +1,20 @@
+[Unit]
+Description=knowt API (chat-first comprehension factory)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/knowt
+Environment=PYTHONPATH=/root/knowt/src
+Environment=KNOWT_ENV=production
+Environment=KNOWT_DATA_DIR=/root/knowt-data
+Environment=KNOWT_HOST=127.0.0.1
+Environment=KNOWT_PORT=8766
+EnvironmentFile=-/root/knowt/.env
+ExecStart=/root/knowt/.venv/bin/python -m knowt.app
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

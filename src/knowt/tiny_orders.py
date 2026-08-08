@@ -31,19 +31,25 @@ def fetch_orders_page(
     api_token: str,
     *,
     page: int = 1,
+    data_inicial: str | None = None,
+    data_final: str | None = None,
     timeout: float = 60.0,
 ) -> TinyOrdersPage:
     token = (api_token or "").strip()
     if not token:
         return TinyOrdersPage(ok=False, reason_code="SECRET_EMPTY")
 
-    body = urllib.parse.urlencode(
-        {
-            "token": token,
-            "formato": "JSON",
-            "pagina": str(max(1, int(page))),
-        }
-    ).encode("utf-8")
+    payload = {
+        "token": token,
+        "formato": "JSON",
+        "pagina": str(max(1, int(page))),
+    }
+    if data_inicial:
+        payload["dataInicial"] = data_inicial
+    if data_final:
+        payload["dataFinal"] = data_final
+
+    body = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(
         TINY_V2_ORDERS_URL,
         data=body,
@@ -148,4 +154,97 @@ def fetch_orders_page(
         order_count=len(ids),
         order_ids=ids[:50],
         detail="page_ok",
+    )
+
+
+@dataclass
+class TinyOrdersCount:
+    ok: bool
+    reason_code: str
+    data_inicial: str
+    data_final: str
+    total_orders: int = 0
+    pages_fetched: int = 0
+    total_pages: Optional[int] = None
+    truncated: bool = False
+    sample_ids: List[str] = field(default_factory=list)
+    detail: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def count_orders_in_period(
+    api_token: str,
+    *,
+    data_inicial: str,
+    data_final: str,
+    max_pages: int = 40,
+    timeout: float = 60.0,
+) -> TinyOrdersCount:
+    """Percorre páginas no intervalo Tiny; corta em max_pages com truncated=True."""
+    total = 0
+    sample: List[str] = []
+    total_pages: Optional[int] = None
+    pages = 0
+
+    first = fetch_orders_page(
+        api_token,
+        page=1,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        timeout=timeout,
+    )
+    if not first.ok:
+        return TinyOrdersCount(
+            ok=False,
+            reason_code=first.reason_code,
+            data_inicial=data_inicial,
+            data_final=data_final,
+            detail=first.detail,
+        )
+
+    total_pages = first.total_pages or 1
+    pages = 1
+    total += first.order_count
+    sample.extend(first.order_ids[:10])
+
+    last_page = min(total_pages, max_pages)
+    for p in range(2, last_page + 1):
+        page = fetch_orders_page(
+            api_token,
+            page=p,
+            data_inicial=data_inicial,
+            data_final=data_final,
+            timeout=timeout,
+        )
+        pages += 1
+        if not page.ok:
+            return TinyOrdersCount(
+                ok=False,
+                reason_code=page.reason_code,
+                data_inicial=data_inicial,
+                data_final=data_final,
+                total_orders=total,
+                pages_fetched=pages,
+                total_pages=total_pages,
+                sample_ids=sample[:10],
+                detail=page.detail,
+            )
+        total += page.order_count
+        if len(sample) < 10:
+            sample.extend(page.order_ids[: max(0, 10 - len(sample))])
+
+    truncated = bool(total_pages and total_pages > max_pages)
+    return TinyOrdersCount(
+        ok=True,
+        reason_code="OK",
+        data_inicial=data_inicial,
+        data_final=data_final,
+        total_orders=total,
+        pages_fetched=pages,
+        total_pages=total_pages,
+        truncated=truncated,
+        sample_ids=sample[:10],
+        detail="truncated" if truncated else "full",
     )

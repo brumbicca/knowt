@@ -53,7 +53,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Tiny `orders.list` | **live** / `machine_validated` (2026-08-08) — página 1 = 100 pedidos · 3796 páginas |
 | Tiny `sales.summary` | ainda `unavailable` |
 | Data path | `/root/knowt-data` |
-| Supervisor / serviços | _TBD_ |
+| API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
+| Chat answer | `POST /v1/chat/answer` · períodos: hoje/ontem/esta semana/este mês/range |
 
 ### O que enviar ao agente após criar VPS + GitHub
 
@@ -68,10 +69,11 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 1. ~~Visão + scaffold repo~~  
 2. ~~Provisionar VPS~~ · ~~bootstrap `/root/knowt`~~ · DNS knowt ainda TBD  
 3. ~~MVP 0 código~~ (vault, sources, discovery stub, enforcement, health) — ver `docs/MVP0.md`  
-4. Extrair/adaptar módulos Fiesta com valor (discovery real Tiny)  
-5. Piloto Tiny no knowt (credencial knowt; capabilities live só após validação)  
-6. DNS knowt + Nginx/TLS  
+4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~  
+5. Extrair/adaptar discovery real Tiny (mais capabilities)  
+6. DNS knowt + Nginx/TLS (+ firewall 80/443 no Hostinger)  
 7. Hermes novo + SOUL/catálogo DoD  
+8. `sales.summary` / margem só com validação de negócio (não publicar cego)  
 
 ## Agente
 
