@@ -56,13 +56,33 @@ def create_app(settings: Settings | None = None) -> Flask:
             }
         )
 
+    @app.post("/v1/chat/enforce")
+    def chat_enforce():
+        registry.load()
+        payload = request.get_json(silent=True) or {}
+        message = (payload.get("message") or "").strip()
+        source_id = (payload.get("source_id") or "tinyerp").strip()
+        result = enforce(registry, message=message, source_id=source_id)
+        return jsonify({"ok": True, "enforcement": result.to_dict()})
+
+    @app.post("/v1/chat/answer")
+    def chat_answer():
+        registry.load()
+        payload = request.get_json(silent=True) or {}
+        message = (payload.get("message") or "").strip()
+        source_id = (payload.get("source_id") or "tinyerp").strip()
+        result = answer_chat(registry, message=message, source_id=source_id)
+        return jsonify({"ok": True, **result})
+
     @app.get("/v1/sources")
     def list_sources():
+        registry.load()
         rows = [s.to_dict() for s in registry.list(org_id=settings.org_id)]
         return jsonify({"ok": True, "sources": rows})
 
     @app.get("/v1/sources/<source_id>")
     def get_source(source_id: str):
+        registry.load()
         src = registry.get(source_id)
         if not src:
             return jsonify({"ok": False, "reason_code": "SOURCE_NOT_FOUND"}), 404
@@ -160,22 +180,6 @@ def create_app(settings: Settings | None = None) -> Flask:
                 "evidence_detail": detail.to_dict(),
             }
         )
-
-    @app.post("/v1/chat/enforce")
-    def chat_enforce():
-        payload = request.get_json(silent=True) or {}
-        message = (payload.get("message") or "").strip()
-        source_id = (payload.get("source_id") or "tinyerp").strip()
-        result = enforce(registry, message=message, source_id=source_id)
-        return jsonify({"ok": True, "enforcement": result.to_dict()})
-
-    @app.post("/v1/chat/answer")
-    def chat_answer():
-        payload = request.get_json(silent=True) or {}
-        message = (payload.get("message") or "").strip()
-        source_id = (payload.get("source_id") or "tinyerp").strip()
-        result = answer_chat(registry, message=message, source_id=source_id)
-        return jsonify({"ok": True, **result})
 
     return app
 
