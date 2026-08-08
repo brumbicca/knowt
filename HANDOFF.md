@@ -51,6 +51,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Firewall Hostinger | grupo `knowt` Ativo · Accept SSH/22 (+ Drop Any) |
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
 | Tiny `orders.list` | **live** / `machine_validated` (2026-08-08) — página 1 = 100 pedidos · 3796 páginas |
+| Tiny `orders.detail` | **live** / `machine_validated` após publish (pedido.obter) |
 | Tiny `sales.summary` | ainda `unavailable` |
 | Data path | `/root/knowt-data` |
 | API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
@@ -77,8 +78,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 1. ~~Visão + scaffold repo~~  
 2. ~~Provisionar VPS~~ · ~~bootstrap `/root/knowt`~~ · DNS knowt ainda TBD  
 3. ~~MVP 0 código~~ (vault, sources, discovery stub, enforcement, health) — ver `docs/MVP0.md`  
-4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~  
-5. Extrair/adaptar discovery real Tiny (mais capabilities)  
+4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~ · ~~contagem page_bounds~~ · ~~orders.detail + catálogo no chat~~  
+5. Extrair/adaptar discovery real Tiny (mais endpoints)  
 6. DNS knowt + Nginx/TLS (+ firewall 80/443 no Hostinger)  
 7. Hermes novo + SOUL/catálogo DoD  
 8. `sales.summary` / margem só com validação de negócio (não publicar cego)  

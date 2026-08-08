@@ -61,6 +61,30 @@ def run_discovery_stub(registry: SourceRegistry, source_id: str) -> DiscoveryRep
             "Token Tiny válido para pedidos.pesquisa — capabilities continuam "
             "unavailable até publicação/validação de negócio"
         )
+        from knowt.tiny_order_detail import fetch_order_detail
+        from knowt.tiny_orders import fetch_orders_page
+
+        page = fetch_orders_page(token, page=1)
+        sample_id = page.order_ids[0] if page.ok and page.order_ids else None
+        if sample_id:
+            det = fetch_order_detail(token, sample_id)
+            evidence.append(
+                "tiny_pedido_obter:ok=%s:id=%s:reason=%s:situacao=%s"
+                % (det.ok, sample_id, det.reason_code, det.situacao)
+            )
+            if det.ok:
+                hypotheses.append(
+                    "pedido.obter responde para id amostral — candidata a "
+                    "orders.detail após publish explícito"
+                )
+            else:
+                hypotheses.append(
+                    f"pedido.obter falhou ({det.reason_code}) — "
+                    "não publicar orders.detail"
+                )
+        else:
+            evidence.append("tiny_pedido_obter:skipped_no_sample_id")
+
         return DiscoveryReport(
             source_id=source_id,
             status="complete",

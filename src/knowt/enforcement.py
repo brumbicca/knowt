@@ -6,9 +6,10 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from knowt.models import Capability
+from knowt.order_id import extract_order_id
 from knowt.sources import SourceRegistry
 
-# (capability_id preferida, padrões)
+# (capability_id preferida, padrões) — ordem importa
 _INTENT_RULES: List[Tuple[str, Tuple[str, ...]]] = [
     (
         "sales.summary",
@@ -28,6 +29,14 @@ _INTENT_RULES: List[Tuple[str, Tuple[str, ...]]] = [
     ),
 ]
 
+_CATALOG_PATTERNS = (
+    r"\bcat[aá]logo\b",
+    r"\bcapabilities?\b",
+    r"\bo\s+que\s+(?:podes|consegues|sabes)\b",
+    r"\bo\s+que\s+(?:est[aá]|fica)\s+(?:live|publicado)\b",
+    r"\bquais\s+(?:perguntas|dados)\b",
+)
+
 
 @dataclass
 class EnforcementResult:
@@ -42,15 +51,43 @@ class EnforcementResult:
         return asdict(self)
 
 
+def wants_catalog(text: str) -> bool:
+    msg = (text or "").strip().lower()
+    if not msg:
+        return False
+    return any(re.search(p, msg, flags=re.I) for p in _CATALOG_PATTERNS)
+
+
 def classify_intent(text: str) -> Optional[str]:
     msg = (text or "").strip().lower()
     if not msg:
         return None
+    if extract_order_id(msg):
+        return "orders.detail"
+    if wants_catalog(msg):
+        return None  # tratado como catalog no enforce
     for cap_id, patterns in _INTENT_RULES:
         for pat in patterns:
             if re.search(pat, msg, flags=re.I):
                 return cap_id
     return None
+
+
+def format_source_catalog(registry: SourceRegistry, source_id: str) -> str:
+    src = registry.get(source_id)
+    if not src:
+        return "Fonte desconhecida."
+    lines = [f"Fonte `{source_id}` ({src.system}) · estado `{src.status}`:"]
+    for cap in sorted(src.capabilities, key=lambda c: c.id):
+        lines.append(
+            f"- `{cap.id}` → **{cap.status}** / {cap.quality}"
+            + (f" — {cap.description}" if cap.description else "")
+        )
+    lines.append(
+        "Posso responder como fato só o que está **live** + "
+        "`machine_validated`. Vendas/margem ficam bloqueadas até validação."
+    )
+    return "\n".join(lines)
 
 
 def enforce(
@@ -69,14 +106,24 @@ def enforce(
             source_id=source_id,
         )
 
+    if wants_catalog(message):
+        return EnforcementResult(
+            allow_llm=True,
+            mode="catalog",
+            message=format_source_catalog(registry, source_id),
+            source_id=source_id,
+            reason_code="CATALOG",
+        )
+
     cap_id = classify_intent(message)
     if not cap_id:
         return EnforcementResult(
             allow_llm=True,
             mode="catalog",
             message=(
-                "Pergunta fora dos domínios com regras de capability neste MVP. "
-                "Posso falar do catálogo/estado da fonte, não inventar métricas."
+                format_source_catalog(registry, source_id)
+                + "\nPergunta fora dos domínios com regras neste MVP — "
+                "não invento métricas."
             ),
             source_id=source_id,
             reason_code="NO_DOMAIN_MATCH",

@@ -8,8 +8,13 @@ from knowt.answers import answer_chat
 from knowt.config import Settings
 from knowt.discovery import run_discovery_stub
 from knowt.enforcement import enforce
-from knowt.publish import publish_orders_list_live
+from knowt.publish import (
+    ensure_tiny_capability_slots,
+    publish_orders_detail_live,
+    publish_orders_list_live,
+)
 from knowt.sources import SourceRegistry, seed_tiny_draft
+from knowt.tiny_order_detail import fetch_order_detail
 from knowt.tiny_orders import fetch_orders_page
 from knowt.vault import resolve_secret
 
@@ -33,6 +38,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     registry = SourceRegistry(settings.data_dir / "sources.json")
     seed_tiny_draft(registry, org_id=settings.org_id)
+    ensure_tiny_capability_slots(registry, "tinyerp")
 
     app = Flask("knowt")
     app.config["KNOWT_SETTINGS"] = settings
@@ -86,6 +92,7 @@ def create_app(settings: Settings | None = None) -> Flask:
         src = registry.get(source_id)
         if not src:
             return jsonify({"ok": False, "reason_code": "SOURCE_NOT_FOUND"}), 404
+        ensure_tiny_capability_slots(registry, source_id)
         ref = (src.secret_refs or {}).get("api_token") or "KNOWT_SECRET_TINY_TOKEN"
         token = resolve_secret(ref, required=True)
         page = fetch_orders_page(token, page=1)
@@ -106,6 +113,51 @@ def create_app(settings: Settings | None = None) -> Flask:
                 "ok": True,
                 "capability": cap.to_dict(),
                 "evidence_page": page.to_dict(),
+            }
+        )
+
+    @app.post("/v1/sources/<source_id>/capabilities/orders.detail/publish")
+    def publish_orders_detail(source_id: str):
+        """Publica orders.detail só após pedido.obter OK num id amostral."""
+        src = registry.get(source_id)
+        if not src:
+            return jsonify({"ok": False, "reason_code": "SOURCE_NOT_FOUND"}), 404
+        ensure_tiny_capability_slots(registry, source_id)
+        ref = (src.secret_refs or {}).get("api_token") or "KNOWT_SECRET_TINY_TOKEN"
+        token = resolve_secret(ref, required=True)
+        order_id = (request.args.get("order_id") or "").strip()
+        if not order_id:
+            page = fetch_orders_page(token, page=1)
+            if not page.ok or not page.order_ids:
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "reason_code": "PUBLISH_BLOCKED_NO_SAMPLE",
+                            "page": page.to_dict() if page else None,
+                        }
+                    ),
+                    409,
+                )
+            order_id = page.order_ids[0]
+        detail = fetch_order_detail(token, order_id)
+        if not detail.ok:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "reason_code": "PUBLISH_BLOCKED_PROBE",
+                        "detail": detail.to_dict(),
+                    }
+                ),
+                409,
+            )
+        cap = publish_orders_detail_live(registry, source_id)
+        return jsonify(
+            {
+                "ok": True,
+                "capability": cap.to_dict(),
+                "evidence_detail": detail.to_dict(),
             }
         )
 

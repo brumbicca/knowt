@@ -89,6 +89,13 @@ def seed_tiny_draft(registry: SourceRegistry, *, org_id: str = "default") -> Sou
                 quality="unknown",
                 description="Lista de pedidos — só live após discovery+validação",
             ),
+            Capability(
+                id="orders.detail",
+                domain="orders",
+                status="unavailable",
+                quality="unknown",
+                description="Detalhe de pedido — só live após discovery+validação",
+            ),
         ],
         notes="Piloto knowt (narrativa distinta do bi_tinyerp Fiesta).",
     )
