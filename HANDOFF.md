@@ -46,7 +46,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | API / chat URL | domínio knowt (_subdomínios TBD_) |
 | Mongo | instância própria na VPS knowt |
 | Hermes home | isolado do Fiesta |
-| GitHub | criar remoto e ligar a `c:\Apps\knowt` (_URL TBD_) |
+| GitHub | https://github.com/brumbicca/knowt |
 | Supervisor / serviços | _TBD_ |
 
 ### O que enviar ao agente após criar VPS + GitHub
