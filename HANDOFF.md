@@ -17,7 +17,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Piloto | Tiny ERP / Olist |
 | Tenancy MVP | Single-tenant (arquitectura ciente de org_id depois) |
 | Repo | `c:\Apps\knowt` (git local; remoto TBD) |
-| VPS | Nova, **ainda não provisionada** |
+| VPS | Nova · `179.198.118.171` · SSH verificado 2026-08-08 |
 | Hermes | Instância **nova** (não o da VPS Fiesta) |
 
 ## O que NÃO fazer
@@ -62,7 +62,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 ## Próximos passos técnicos (ordem)
 
 1. ~~Visão + scaffold repo~~  
-2. Provisionar VPS + DNS knowt + checklist `docs/VPS_CHECKLIST.md`  
+2. ~~Provisionar VPS~~ · DNS knowt ainda TBD · checklist `docs/VPS_CHECKLIST.md`  
 3. MVP 0 código: cofre + source registry + discovery stub + gateway chat enforcement  
 4. Extrair/adaptar módulos do mapa de herança (sem S1 sync)  
 5. Piloto Tiny no knowt (narrativa própria; token/credencial knowt, não “muleta S1” opaca)  
