@@ -68,6 +68,14 @@ def probe_tiny_v2_orders(api_token: str, *, timeout: float = 25.0) -> TinyProbeR
             reason_code="NETWORK_ERROR",
             detail=str(exc.reason)[:200],
         )
+    except TimeoutError as exc:
+        return TinyProbeResult(
+            ok=False,
+            http_status=None,
+            tinystatus=None,
+            reason_code="TIMEOUT",
+            detail=str(exc)[:200],
+        )
 
     tinystatus = None
     try:
