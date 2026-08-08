@@ -1,0 +1,18 @@
+[project]
+name = "knowt"
+version = "0.1.0"
+description = "Compreensão de sistemas — chat-first, zero verdade silenciosa"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "flask>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

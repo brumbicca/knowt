@@ -65,10 +65,11 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 
 1. ~~Visão + scaffold repo~~  
 2. ~~Provisionar VPS~~ · ~~bootstrap `/root/knowt`~~ · DNS knowt ainda TBD  
-3. MVP 0 código: cofre + source registry + discovery stub + gateway chat enforcement  
-4. Extrair/adaptar módulos do mapa de herança (sem S1 sync)  
-5. Piloto Tiny no knowt (narrativa própria; token/credencial knowt, não “muleta S1” opaca)  
-6. Hermes novo + SOUL/catálogo DoD  
+3. ~~MVP 0 código~~ (vault, sources, discovery stub, enforcement, health) — ver `docs/MVP0.md`  
+4. Extrair/adaptar módulos Fiesta com valor (discovery real Tiny)  
+5. Piloto Tiny no knowt (credencial knowt; capabilities live só após validação)  
+6. DNS knowt + Nginx/TLS  
+7. Hermes novo + SOUL/catálogo DoD  
 
 ## Agente
 
