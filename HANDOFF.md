@@ -43,7 +43,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 |---|---|
 | VPS host | `root@179.198.118.171` (`srv1890207.hstgr.cloud`) |
 | SSH key | `%USERPROFILE%\.ssh\id_ed25519_knowt` (comentário `knowt-vps`) |
-| API / chat URL | domínio knowt (_DNS TBD_) |
+| API / chat URL | https://knowt.com.br (TLS 2026-08-08) |
 | Mongo | instância própria na VPS knowt (_ainda não_) |
 | Hermes home | isolado do Fiesta (_ainda não_) |
 | GitHub | https://github.com/brumbicca/knowt |
