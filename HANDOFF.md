@@ -49,7 +49,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | GitHub | https://github.com/brumbicca/knowt |
 | OS | Ubuntu 24.04.4 LTS · KVM 2 (~8 GB RAM · 2 vCPU) |
 | Firewall Hostinger | grupo `knowt` Ativo · Accept SSH/22 (+ Drop Any) |
-| Deploy path | `/root/knowt` (clone GitHub · HEAD bootstrap 2026-08-08) |
+| Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
+| Tiny probe | OK (`pedidos.pesquisa` status OK) — capabilities ainda `unavailable` |
 | Data path | `/root/knowt-data` |
 | Supervisor / serviços | _TBD_ |
 
