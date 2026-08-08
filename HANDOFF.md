@@ -41,12 +41,14 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 
 | Item | Valor |
 |---|---|
-| VPS host | _TBD — utilizador a provisionar_ |
-| SSH key | Sugerido: `%USERPROFILE%\.ssh\id_ed25519_knowt` (dedicada; não misturar com Fiesta) |
-| API / chat URL | domínio knowt (_subdomínios TBD_) |
-| Mongo | instância própria na VPS knowt |
-| Hermes home | isolado do Fiesta |
+| VPS host | `root@179.198.118.171` (`srv1890207.hstgr.cloud`) |
+| SSH key | `%USERPROFILE%\.ssh\id_ed25519_knowt` (comentário `knowt-vps`) |
+| API / chat URL | domínio knowt (_DNS TBD_) |
+| Mongo | instância própria na VPS knowt (_ainda não_) |
+| Hermes home | isolado do Fiesta (_ainda não_) |
 | GitHub | https://github.com/brumbicca/knowt |
+| OS | Ubuntu 24.04.4 LTS · KVM 2 (~8 GB RAM · 2 vCPU) |
+| Firewall Hostinger | grupo `knowt` Ativo · Accept SSH/22 (+ Drop Any) |
 | Supervisor / serviços | _TBD_ |
 
 ### O que enviar ao agente após criar VPS + GitHub
