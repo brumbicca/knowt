@@ -1,24 +1,30 @@
 from pathlib import Path
 
 from knowt.app import create_app
+from knowt.audit import append_answer_audit, audit_path_for
 from knowt.config import Settings
 
 
-def test_health_and_enforce(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("KNOWT_SECRET_TINY_TOKEN", raising=False)
-    settings = Settings(
+def _settings(tmp_path: Path, *, api_token: str = "") -> Settings:
+    return Settings(
         env="test",
         data_dir=tmp_path,
         org_id="default",
         host="127.0.0.1",
         port=8766,
+        api_token=api_token,
     )
-    app = create_app(settings)
+
+
+def test_health_and_enforce(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("KNOWT_SECRET_TINY_TOKEN", raising=False)
+    app = create_app(_settings(tmp_path))
     client = app.test_client()
 
     h = client.get("/health")
     assert h.status_code == 200
     assert h.get_json()["service"] == "knowt"
+    assert h.get_json()["auth_required"] is False
 
     s = client.get("/v1/sources")
     assert s.status_code == 200
@@ -32,3 +38,30 @@ def test_health_and_enforce(tmp_path: Path, monkeypatch):
     body = e.get_json()["enforcement"]
     assert body["reason_code"] == "CAPABILITY_UNAVAILABLE"
     assert body["allow_llm"] is False
+
+
+def test_api_token_required(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("KNOWT_SECRET_TINY_TOKEN", raising=False)
+    app = create_app(_settings(tmp_path, api_token="secret-token"))
+    client = app.test_client()
+
+    assert client.get("/health").status_code == 200
+    assert client.get("/v1/sources").status_code == 401
+    ok = client.get("/v1/sources", headers={"Authorization": "Bearer secret-token"})
+    assert ok.status_code == 200
+
+
+def test_audit_append(tmp_path: Path):
+    path = audit_path_for(tmp_path)
+    append_answer_audit(
+        path,
+        message="ping",
+        source_id="tinyerp",
+        result={
+            "enforcement": {"mode": "catalog", "reason_code": "CATALOG"},
+            "answer": "ola",
+            "data": None,
+        },
+    )
+    assert path.exists()
+    assert "ping" in path.read_text(encoding="utf-8")

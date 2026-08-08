@@ -55,15 +55,20 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Tiny `sales.summary` | ainda `unavailable` |
 | Data path | `/root/knowt-data` |
 | API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
-| Chat answer | `POST /v1/chat/answer` · períodos: hoje/ontem/esta semana/este mês/range |
+| Chat answer | `POST /v1/chat/answer` · períodos + situação · Bearer `KNOWT_API_TOKEN` |
 | Contagem período | 1ª+última página Tiny (`page_bounds`) — sem varrer todas as páginas |
-| Nginx / TLS | rascunho `deploy/nginx-knowt.example.conf` — **só após DNS + firewall 80/443** |
+| Audit | `/root/knowt-data/audit/answers.jsonl` |
+| Nginx / TLS | rascunho `deploy/nginx-knowt.example.conf` — ver `docs/DNS.md` |
 
-### Precisa do humano
+### Precisa do humano (avisar quando feito)
 
-1. Apontar DNS knowt → `179.198.118.171`
-2. No firewall Hostinger do grupo `knowt`: Accept **80** e **443** (manter SSH/22)
-3. Avisar o agente — activa nginx + certbot
+Ver `docs/DNS.md`. Em resumo:
+
+1. DNS A knowt → `179.198.118.171`
+2. Firewall Hostinger: Accept **80** + **443**
+3. Mensagem no chat: «DNS feito»
+
+Até lá a API fica só em loopback + Bearer `KNOWT_API_TOKEN`.
 
 ### O que enviar ao agente após criar VPS + GitHub
 

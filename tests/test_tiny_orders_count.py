@@ -31,7 +31,7 @@ def test_count_single_page():
 
 
 def test_count_page_bounds():
-    def fake(token, *, page, data_inicial, data_final, timeout=60.0):
+    def fake(token, *, page, data_inicial, data_final, situacao=None, timeout=60.0):
         if page == 1:
             return _page(page=1, total_pages=33, order_count=100)
         if page == 33:
@@ -48,7 +48,7 @@ def test_count_page_bounds():
 
 
 def test_count_rejects_inconsistent_last_page():
-    def fake(token, *, page, data_inicial, data_final, timeout=60.0):
+    def fake(token, *, page, data_inicial, data_final, situacao=None, timeout=60.0):
         if page == 1:
             return _page(page=1, total_pages=3, order_count=50)
         return _page(page=3, total_pages=3, order_count=80)

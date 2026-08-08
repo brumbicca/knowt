@@ -33,6 +33,7 @@ def fetch_orders_page(
     page: int = 1,
     data_inicial: str | None = None,
     data_final: str | None = None,
+    situacao: str | None = None,
     timeout: float = 60.0,
 ) -> TinyOrdersPage:
     token = (api_token or "").strip()
@@ -48,6 +49,8 @@ def fetch_orders_page(
         payload["dataInicial"] = data_inicial
     if data_final:
         payload["dataFinal"] = data_final
+    if situacao:
+        payload["situacao"] = situacao
 
     body = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -180,6 +183,7 @@ def count_orders_in_period(
     *,
     data_inicial: str,
     data_final: str,
+    situacao: str | None = None,
     timeout: float = 60.0,
 ) -> TinyOrdersCount:
     """Conta pedidos no intervalo sem varrer todas as páginas.
@@ -193,6 +197,7 @@ def count_orders_in_period(
         page=1,
         data_inicial=data_inicial,
         data_final=data_final,
+        situacao=situacao,
         timeout=timeout,
     )
     if not first.ok:
@@ -239,6 +244,7 @@ def count_orders_in_period(
         page=total_pages,
         data_inicial=data_inicial,
         data_final=data_final,
+        situacao=situacao,
         timeout=timeout,
     )
     if not last.ok:

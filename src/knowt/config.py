@@ -13,6 +13,7 @@ class Settings:
     org_id: str
     host: str
     port: int
+    api_token: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -23,4 +24,5 @@ class Settings:
             org_id=(os.getenv("KNOWT_ORG_ID") or "default").strip() or "default",
             host=(os.getenv("KNOWT_HOST") or "127.0.0.1").strip(),
             port=int(os.getenv("KNOWT_PORT") or "8766"),
+            api_token=(os.getenv("KNOWT_API_TOKEN") or "").strip(),
         )

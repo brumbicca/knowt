@@ -5,6 +5,8 @@ from flask import Flask, jsonify, request
 
 from knowt import __version__
 from knowt.answers import answer_chat
+from knowt.audit import append_answer_audit, audit_path_for
+from knowt.auth import extract_bearer
 from knowt.config import Settings
 from knowt.discovery import run_discovery_stub
 from knowt.enforcement import enforce
@@ -44,6 +46,27 @@ def create_app(settings: Settings | None = None) -> Flask:
     app.config["KNOWT_SETTINGS"] = settings
     app.config["KNOWT_REGISTRY"] = registry
 
+    @app.before_request
+    def _auth_v1():
+        if not request.path.startswith("/v1/"):
+            return None
+        expected = (settings.api_token or "").strip()
+        if not expected:
+            return None
+        got = extract_bearer(request)
+        if got != expected:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "reason_code": "UNAUTHORIZED",
+                        "message": "Token knowt em falta ou inválido.",
+                    }
+                ),
+                401,
+            )
+        return None
+
     @app.get("/health")
     def health():
         return jsonify(
@@ -53,6 +76,7 @@ def create_app(settings: Settings | None = None) -> Flask:
                 "version": __version__,
                 "env": settings.env,
                 "org_id": settings.org_id,
+                "auth_required": bool(settings.api_token),
             }
         )
 
@@ -72,6 +96,15 @@ def create_app(settings: Settings | None = None) -> Flask:
         message = (payload.get("message") or "").strip()
         source_id = (payload.get("source_id") or "tinyerp").strip()
         result = answer_chat(registry, message=message, source_id=source_id)
+        try:
+            append_answer_audit(
+                audit_path_for(settings.data_dir),
+                message=message,
+                source_id=source_id,
+                result=result,
+            )
+        except OSError:
+            pass
         return jsonify({"ok": True, **result})
 
     @app.get("/v1/sources")
