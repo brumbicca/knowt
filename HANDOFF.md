@@ -50,7 +50,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | OS | Ubuntu 24.04.4 LTS · KVM 2 (~8 GB RAM · 2 vCPU) |
 | Firewall Hostinger | grupo `knowt` Ativo · Accept SSH/22 (+ Drop Any) |
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
-| Tiny probe | OK (`pedidos.pesquisa` status OK) — capabilities ainda `unavailable` |
+| Tiny `orders.list` | **live** / `machine_validated` (2026-08-08) — página 1 = 100 pedidos · 3796 páginas |
+| Tiny `sales.summary` | ainda `unavailable` |
 | Data path | `/root/knowt-data` |
 | Supervisor / serviços | _TBD_ |
 
