@@ -41,12 +41,21 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 
 | Item | Valor |
 |---|---|
-| VPS host | _TBD_ |
-| SSH key | _TBD_ (padrão sugerido: chave dedicada `id_ed25519_knowt`) |
-| API / chat URL | _TBD_ (domínio knowt) |
-| Mongo | _TBD_ (instância própria) |
-| Hermes home | _TBD_ (não `/root/.hermes` da Fiesta sem isolamento) |
+| VPS host | _TBD — utilizador a provisionar_ |
+| SSH key | Sugerido: `%USERPROFILE%\.ssh\id_ed25519_knowt` (dedicada; não misturar com Fiesta) |
+| API / chat URL | domínio knowt (_subdomínios TBD_) |
+| Mongo | instância própria na VPS knowt |
+| Hermes home | isolado do Fiesta |
+| GitHub | criar remoto e ligar a `c:\Apps\knowt` (_URL TBD_) |
 | Supervisor / serviços | _TBD_ |
+
+### O que enviar ao agente após criar VPS + GitHub
+
+1. URL do repo GitHub (ex. `https://github.com/<org>/knowt`)
+2. IP da VPS + user SSH (ex. `root@x.x.x.x`)
+3. Confirmar se a chave pública `id_ed25519_knowt.pub` já está em `authorized_keys`
+4. Domínio(s) apontados (A/AAAA) para o IP
+5. **Não** enviar password root no chat
 
 ## Próximos passos técnicos (ordem)
 
