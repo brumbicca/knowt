@@ -202,9 +202,9 @@ Ordem saudável:
 | Tema | Opções | Estado |
 |---|---|---|
 | Nome do produto | knowt | **Decidido** (domínio reservado) |
-| Repo | Novo vs pasta no monorepo | **Proposta: repo novo** (`knowt`) |
+| Repo | `c:\Apps\knowt` (git local) | **Decidido** (remote GitHub depois) |
 | VPS | Nova vs mesma isolada | **Proposta: VPS nova** (ainda sem VPS) |
-| Multi-tenant no dia 1? | Sim / single-tenant primeiro | Aberto |
+| Multi-tenant no dia 1? | Single-tenant MVP; multi depois | **Decidido** (2026-08-08) |
 | Primeiro piloto knowt | Tiny ERP / Olist | **Decidido** |
 | BI visual | Só Insights+chat / BI mínimo depois | **Proposta: chat+Insights primeiro** |
 | Relação comercial com Fiesta | Narrativas distintas | **Decidido** (por ora) |
