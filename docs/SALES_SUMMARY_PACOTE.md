@@ -63,22 +63,25 @@ notas: …
 
 **Não** marcar `approved_to_publish=true` só porque a contagem bate — falta ainda `cost_field` ≠ `defer` (ou decisão explícita) + dono.
 
-## Discovery UI Playwright (aba Custos)
-
-Em vez de guiar cliques à mão, o knowt grava evidência sozinho:
+## Discovery UI Playwright (conhecer o sistema)
 
 ```text
 pip install "playwright>=1.40,<2"
 python -m playwright install chromium
-# 1ª vez (humano no browser):
 python scripts/run_discovery_ui.py login
-# depois (headless):
+# mapa do ERP (navegação + páginas-chave):
+python scripts/run_discovery_ui.py probe-system
+# fatia margem (não preenche gate):
 python scripts/run_discovery_ui.py probe-cost --product-id 747196165
 ```
 
 - Sessão: `$KNOWT_DATA_DIR/discovery/tinyerp/storage_state.json`
-- Evidence: `evidence/ui_tiny_product_cost_*.json`
-- **Não** preenche `cost_field` no gate — só labels/valores observados.
+- Mapa: `evidence/ui_system_map_*.json`
+- Custos: `evidence/ui_tiny_product_cost_*.json`
+- **Não** publica capability nem preenche `cost_field` sozinho
+
+`cost_field` fica **`defer`** até o dono escolher preço custo vs custo médio  
+(evidência: SKU balão UI/API 0,81 vs 18,31).
 
 ## O que o knowt faz agora
 

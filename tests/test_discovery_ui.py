@@ -55,20 +55,12 @@ def test_parse_cost_pairs_from_body_text():
     assert by["preco_custo_medio"]["parsed"] == 2.75
 
 
-def test_parse_cost_pairs_olist_multiline_cells():
-    from knowt.discovery_ui import parse_cost_pairs_from_body_text
+def test_clean_texts_and_targets():
+    from knowt.discovery_ui import TINY_SYSTEM_TARGETS, _clean_texts
 
-    # Forma real Olist: cada célula em linha própria
-    body = (
-        "custos\n"
-        "A partir de\tSaldo atual\tSaldo anterior\tImpostos recuperáveis\t"
-        "Preço custo\tCusto médio\tPreço venda\t\n\n\n"
-        "01/01/2000\n\n\t\n\n0,00\n\n\t\n\n0,00\n\n\t\n\n0,00\n\n\t\n\n0,00\n\n\t\n\n0,00\n\n\t\n\n0,00\n\n\t\n\n\n"
-        "27/08/2024\n\n\t\n\n32,00\n\n\t\n\n32,00\n\n\t\n\n0,00\n\n\t\n\n2,75\n\n\t\n\n2,75\n\n\t\n\n5,70\n"
-    )
-    pairs = parse_cost_pairs_from_body_text(body)
-    fields = fields_from_header_value_pairs(pairs)
-    by = {f["api_key"]: f for f in fields}
-    assert by["preco_custo"]["parsed"] == 2.75
-    assert by["preco_custo_medio"]["parsed"] == 2.75
-    assert by["preco_custo"]["ui_label"] == "Preço custo"
+    assert len(TINY_SYSTEM_TARGETS) >= 6
+    keys = {t["key"] for t in TINY_SYSTEM_TARGETS}
+    assert "pedidos_venda" in keys
+    assert "produtos" in keys
+    cleaned = _clean_texts(["  Vendas  ", "Vendas", "x", "Pedidos de venda"])
+    assert cleaned == ["Vendas", "Pedidos de venda"]

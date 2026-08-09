@@ -1,7 +1,10 @@
-"""Discovery UI (Playwright) — evidência observável Tiny, sem publish.
+"""Discovery UI (Playwright) — conhecer o sistema Tiny/Olist por observação.
 
-Piloto: login interactivo → storage_state; probe da aba Custos de um produto.
-Não auto-preenche `sales_summary_gates.cost_field` (decisão humana).
+- login interactivo → storage_state
+- probe-system → mapa de navegação + páginas-chave (dossiê)
+- probe-cost → aba Custos de um produto (fatia para gates de margem)
+
+Não publica capabilities nem preenche cost_field automaticamente.
 """
 from __future__ import annotations
 
@@ -17,6 +20,70 @@ TZ = ZoneInfo("America/Sao_Paulo")
 
 DEFAULT_BASE_URL = "https://erp.olist.com/"
 DEFAULT_PRODUCT_ID = "747196165"  # CCRCHP-200 — amostra reconciliada 2026-08-09
+
+NAV_SELECTORS = (
+    "nav a",
+    "[role='navigation'] a",
+    "aside a",
+    "header a",
+    ".menu a",
+    ".sidebar a",
+    "[class*='menu'] a",
+    "[class*='Menu'] a",
+)
+
+# Mapa inicial do piloto — expandir conforme o dossiê revelar módulos.
+TINY_SYSTEM_TARGETS = (
+    {"key": "home", "label": "Home", "url": "https://erp.olist.com/", "domain": "inicio"},
+    {
+        "key": "pedidos_venda",
+        "label": "Pedidos de Venda",
+        "url": "https://erp.olist.com/vendas#list",
+        "domain": "vendas",
+    },
+    {
+        "key": "pedidos_ecommerce",
+        "label": "Pedidos no e-commerce",
+        "url": "https://erp.olist.com/lista_pedidos_ecommerce",
+        "domain": "vendas",
+    },
+    {
+        "key": "notas_fiscais",
+        "label": "Notas Fiscais",
+        "url": "https://erp.olist.com/notas_fiscais#list",
+        "domain": "vendas",
+    },
+    {
+        "key": "relatorios_vendas",
+        "label": "Relatórios (vendas)",
+        "url": "https://erp.olist.com/relatorios_sistema?id=3",
+        "domain": "vendas",
+    },
+    {
+        "key": "produtos",
+        "label": "Produtos",
+        "url": "https://erp.olist.com/produtos#list",
+        "domain": "cadastros",
+    },
+    {
+        "key": "clientes",
+        "label": "Clientes",
+        "url": "https://erp.olist.com/contatos#list",
+        "domain": "cadastros",
+    },
+    {
+        "key": "estoque",
+        "label": "Estoque / depósitos",
+        "url": "https://erp.olist.com/depositos#list",
+        "domain": "suprimentos",
+    },
+    {
+        "key": "financeiro_contas",
+        "label": "Contas a receber",
+        "url": "https://erp.olist.com/contas_receber#list",
+        "domain": "financas",
+    },
+)
 
 COST_LABEL_MAP = (
     ("preco_custo", ("preço custo", "preco custo", "preço de custo", "preco de custo")),
@@ -360,7 +427,7 @@ def probe_product_costs(
             "Corre: python scripts/run_discovery_ui.py login "
             "(browser headed; grava sessão em discovery/tinyerp/)"
         )
-        return _persist_evidence(data_dir, out)
+        return _persist_evidence(data_dir, out, kind="ui_tiny_product_cost")
 
     product_url = f"https://erp.olist.com/produtos#edit/{pid}"
 
@@ -393,7 +460,7 @@ def probe_product_costs(
                 out["error"] = "login_wall"
                 out["hint"] = "Renovar sessão: python scripts/run_discovery_ui.py login"
                 browser.close()
-                return _persist_evidence(data_dir, out)
+                return _persist_evidence(data_dir, out, kind="ui_tiny_product_cost")
 
             # Nome do produto (header)
             try:
@@ -441,7 +508,7 @@ def probe_product_costs(
                 except Exception:
                     out["error"] = "cost_tab_not_found"
                     browser.close()
-                    return _persist_evidence(data_dir, out)
+                    return _persist_evidence(data_dir, out, kind="ui_tiny_product_cost")
 
             page.wait_for_timeout(2800)
             typed = _extract_cost_pairs_from_page(page) or []
@@ -472,14 +539,291 @@ def probe_product_costs(
         out["error"] = f"probe_exception:{type(exc).__name__}:{exc}"
         out["hint"] = "Verificar Playwright chromium e storage_state"
 
-    return _persist_evidence(data_dir, out)
+    return _persist_evidence(data_dir, out, kind="ui_tiny_product_cost")
 
 
-def _persist_evidence(data_dir: Path, evidence: Dict[str, Any]) -> Dict[str, Any]:
+def _clean_texts(texts: List[str], *, limit: int = 80) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for raw in texts:
+        t = re.sub(r"\s+", " ", (raw or "").strip())
+        if len(t) < 2 or len(t) > 80:
+            continue
+        key = t.lower()
+        if key in seen:
+            continue
+        if key in {"entrar", "login", "sair", "logout", "©"}:
+            continue
+        seen.add(key)
+        out.append(t)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _collect_nav_labels(page) -> List[str]:
+    raw_labels: List[str] = []
+    for sel in NAV_SELECTORS:
+        try:
+            locs = page.locator(sel)
+            n = min(locs.count(), 80)
+            for i in range(n):
+                try:
+                    t = locs.nth(i).inner_text(timeout=800)
+                except Exception:
+                    continue
+                if t:
+                    raw_labels.append(t)
+        except Exception:
+            continue
+    return _clean_texts(raw_labels)
+
+
+def _collect_nav_links(page, *, limit: int = 60) -> List[Dict[str, str]]:
+    """Href + texto dos links laterais — inventário do sistema."""
+    raw = page.evaluate(
+        """(limit) => {
+          const sels = ['nav a', 'aside a', '[role=navigation] a', '.sidebar a', '[class*=menu] a'];
+          const seen = new Set();
+          const out = [];
+          for (const sel of sels) {
+            for (const el of Array.from(document.querySelectorAll(sel))) {
+              const href = (el.href || '').trim();
+              const text = (el.innerText || '').replace(/\\s+/g, ' ').trim();
+              if (!href || href.startsWith('javascript:') || text.length < 2) continue;
+              const key = href + '|' + text.toLowerCase();
+              if (seen.has(key)) continue;
+              seen.add(key);
+              out.push({ text: text.slice(0, 80), href });
+              if (out.length >= limit) return out;
+            }
+          }
+          return out;
+        }""",
+        limit,
+    )
+    return list(raw or [])
+
+
+def _collect_headings(page, *, limit: int = 20) -> List[str]:
+    texts: List[str] = []
+    for sel in ("h1", "h2", "h3", "[role='heading']"):
+        try:
+            locs = page.locator(sel)
+            n = min(locs.count(), 15)
+            for i in range(n):
+                try:
+                    t = locs.nth(i).inner_text(timeout=600)
+                except Exception:
+                    continue
+                if t:
+                    texts.append(t)
+        except Exception:
+            continue
+    return _clean_texts(texts, limit=limit)
+
+
+def _collect_table_headers(page, *, limit: int = 24) -> List[str]:
+    texts: List[str] = []
+    for sel in ("table thead th", "table th", "[role='columnheader']"):
+        try:
+            locs = page.locator(sel)
+            n = min(locs.count(), 30)
+            for i in range(n):
+                try:
+                    t = locs.nth(i).inner_text(timeout=600)
+                except Exception:
+                    continue
+                if t:
+                    texts.append(t)
+        except Exception:
+            continue
+    return _clean_texts(texts, limit=limit)
+
+
+def _collect_tabs(page, *, limit: int = 20) -> List[str]:
+    texts: List[str] = []
+    for sel in ("[role='tab']", ".nav-tabs a", "[class*='tab'] a", "[class*='Tab'] button"):
+        try:
+            locs = page.locator(sel)
+            n = min(locs.count(), 25)
+            for i in range(n):
+                try:
+                    t = locs.nth(i).inner_text(timeout=500)
+                except Exception:
+                    continue
+                if t:
+                    texts.append(t)
+        except Exception:
+            continue
+    return _clean_texts(texts, limit=limit)
+
+
+def _snapshot_page(
+    page,
+    *,
+    key: str,
+    label: str,
+    domain: str = "",
+) -> Dict[str, Any]:
+    try:
+        body = (page.inner_text("body") or "")[:400]
+    except Exception:
+        body = ""
+    title = (page.title() or "").strip()
+    url = page.url
+    login = _looks_like_login(url, title, body)
+    return {
+        "key": key,
+        "label": label,
+        "domain": domain,
+        "url": url,
+        "page_title": title,
+        "headings": _collect_headings(page),
+        "table_headers": _collect_table_headers(page),
+        "tabs": _collect_tabs(page),
+        "login_wall": login,
+        "ok": (not login) and bool(title or body),
+        "body_preview": re.sub(r"\s+", " ", body).strip()[:180],
+    }
+
+
+def probe_system(
+    data_dir: Path,
+    *,
+    source_id: str = "tinyerp",
+    headless: bool = True,
+    timeout_ms: int = 45_000,
+    shallow: bool = False,
+) -> Dict[str, Any]:
+    """Crawl read-only do ERP → dossiê ui_system_map (conhecer o sistema)."""
+    from playwright.sync_api import sync_playwright
+
+    state = storage_state_path(data_dir, source_id)
+    out: Dict[str, Any] = {
+        "version": 1,
+        "kind": "ui_system_map",
+        "quality": "observation",
+        "at": _now_iso(),
+        "source_id": source_id,
+        "base_url": DEFAULT_BASE_URL,
+        "ok": False,
+        "login_wall": False,
+        "state_path": str(state),
+        "nav_labels": [],
+        "nav_links": [],
+        "pages": [],
+        "domains_seen": [],
+        "hypothesis": (
+            "Mapa UI é evidência de existência/estrutura — não implica capability live."
+        ),
+        "error": None,
+        "hint": None,
+    }
+
+    if not has_storage_state(data_dir, source_id):
+        out["error"] = "storage_state_missing"
+        out["hint"] = "python scripts/run_discovery_ui.py login"
+        return _persist_evidence(data_dir, out, kind="ui_system_map")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=headless)
+            context = browser.new_context(locale="pt-BR", storage_state=str(state))
+            page = context.new_page()
+            page.goto(DEFAULT_BASE_URL, wait_until="domcontentloaded", timeout=timeout_ms)
+            page.wait_for_timeout(1500)
+            title = (page.title() or "").strip()
+            cur = page.url
+            body = ""
+            try:
+                body = page.inner_text("body")[:400]
+            except Exception:
+                body = ""
+
+            if _looks_like_login(cur, title, body):
+                out["login_wall"] = True
+                out["error"] = "login_wall"
+                out["hint"] = "Renovar: python scripts/run_discovery_ui.py login"
+                browser.close()
+                return _persist_evidence(data_dir, out, kind="ui_system_map")
+
+            out["nav_labels"] = _collect_nav_labels(page)
+            out["nav_links"] = _collect_nav_links(page)
+            pages: List[Dict[str, Any]] = []
+            domains: List[str] = []
+
+            targets = TINY_SYSTEM_TARGETS if not shallow else TINY_SYSTEM_TARGETS[:3]
+            for target in targets:
+                try:
+                    # Expõe submenu quando útil
+                    if target["domain"] in {"vendas", "cadastros", "suprimentos", "financas"}:
+                        menu_name = {
+                            "vendas": "Vendas",
+                            "cadastros": "Cadastros",
+                            "suprimentos": "Suprimentos",
+                            "financas": "Finanças",
+                        }.get(target["domain"])
+                        if menu_name:
+                            try:
+                                page.get_by_role("link", name=menu_name, exact=True).first.click(
+                                    timeout=2500
+                                )
+                                page.wait_for_timeout(600)
+                            except Exception:
+                                pass
+                    page.goto(
+                        target["url"],
+                        wait_until="domcontentloaded",
+                        timeout=timeout_ms,
+                    )
+                    page.wait_for_timeout(1400)
+                    snap = _snapshot_page(
+                        page,
+                        key=target["key"],
+                        label=target["label"],
+                        domain=target.get("domain") or "",
+                    )
+                    pages.append(snap)
+                    if snap.get("ok") and target.get("domain"):
+                        domains.append(str(target["domain"]))
+                except Exception as exc:
+                    pages.append(
+                        {
+                            "key": target["key"],
+                            "label": target["label"],
+                            "domain": target.get("domain"),
+                            "url": target["url"],
+                            "ok": False,
+                            "error": f"{type(exc).__name__}: {exc}"[:180],
+                        }
+                    )
+
+            browser.close()
+            out["pages"] = pages
+            out["domains_seen"] = sorted(set(domains))
+            pages_ok = sum(1 for pg in pages if pg.get("ok"))
+            out["ok"] = pages_ok >= 1 and bool(out["nav_labels"] or title)
+            out["pages_ok"] = pages_ok
+            out["pages_total"] = len(pages)
+            if not out["ok"]:
+                out["error"] = "system_probe_weak"
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"probe_exception:{type(exc).__name__}:{exc}"
+
+    return _persist_evidence(data_dir, out, kind="ui_system_map")
+
+
+def _persist_evidence(
+    data_dir: Path,
+    evidence: Dict[str, Any],
+    *,
+    kind: str,
+) -> Dict[str, Any]:
     stamp = datetime.now(TZ).strftime("%Y%m%dT%H%M%S")
     folder = evidence_dir(data_dir)
-    path = folder / f"ui_tiny_product_cost_{stamp}.json"
-    latest = folder / "ui_tiny_product_cost_latest.json"
+    path = folder / f"{kind}_{stamp}.json"
+    latest = folder / f"{kind}_latest.json"
     text = json.dumps(evidence, ensure_ascii=False, indent=2) + "\n"
     path.write_text(text, encoding="utf-8")
     latest.write_text(text, encoding="utf-8")
@@ -489,6 +833,16 @@ def _persist_evidence(data_dir: Path, evidence: Dict[str, Any]) -> Dict[str, Any
 
 def load_latest_product_cost_probe(data_dir: Path) -> Optional[Dict[str, Any]]:
     path = evidence_dir(data_dir) / "ui_tiny_product_cost_latest.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def load_latest_system_map(data_dir: Path) -> Optional[Dict[str, Any]]:
+    path = evidence_dir(data_dir) / "ui_system_map_latest.json"
     if not path.is_file():
         return None
     try:

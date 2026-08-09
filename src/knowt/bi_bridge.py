@@ -16,8 +16,8 @@ from knowt.audit import append_answer_audit, audit_path_for
 from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import Period, today_br
 from knowt.sales_gates import can_publish_sales_summary, load_gates
+from knowt.discovery_ui import load_latest_product_cost_probe, load_latest_system_map
 from knowt.sales_probe import load_latest_probe
-from knowt.discovery_ui import load_latest_product_cost_probe
 from knowt.sources import SourceRegistry
 from knowt.tasks_store import (
     add_task,
@@ -376,6 +376,21 @@ def create_bi_bridge_blueprint(
                     None
                     if probe
                     else "Sem evidence/ui_tiny_product_cost_latest.json — corre probe-cost"
+                ),
+            }
+        )
+
+    @bp.get("/discovery/ui/system-map/latest")
+    def discovery_ui_system_map_latest():
+        probe = load_latest_system_map(data_dir)
+        return jsonify(
+            {
+                "ok": True,
+                "probe": probe,
+                "note": (
+                    None
+                    if probe
+                    else "Sem evidence/ui_system_map_latest.json — corre probe-system"
                 ),
             }
         )

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI Discovery UI knowt — login interactivo e probe aba Custos Tiny."""
+"""CLI Discovery UI knowt — login, mapa do sistema, aba Custos."""
 from __future__ import annotations
 
 import argparse
@@ -24,8 +24,25 @@ from knowt.discovery_ui import (  # noqa: E402
     has_storage_state,
     login_interactive,
     probe_product_costs,
+    probe_system,
     storage_state_path,
 )
+
+
+def _need_state(data_dir: Path) -> int:
+    print(
+        json.dumps(
+            {
+                "ok": False,
+                "error": "storage_state_missing",
+                "state": str(storage_state_path(data_dir)),
+                "hint": "python scripts/run_discovery_ui.py login",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 2
 
 
 def main() -> int:
@@ -35,13 +52,20 @@ def main() -> int:
     p_login = sub.add_parser("login", help="Login headed → grava storage_state")
     p_login.add_argument("--url", default="https://erp.olist.com/")
 
-    p_probe = sub.add_parser("probe-cost", help="Abre produto → aba Custos → evidence")
-    p_probe.add_argument(
-        "--product-id",
-        default=None,
-        help="Id Tiny do produto (default CCRCHP-200 / env KNOWT_DISCOVERY_PRODUCT_ID)",
+    p_sys = sub.add_parser(
+        "probe-system",
+        help="Mapa do ERP: navegação + páginas-chave (conhecer o sistema)",
     )
-    p_probe.add_argument("--headed", action="store_true", help="Mostrar browser")
+    p_sys.add_argument("--headed", action="store_true")
+    p_sys.add_argument(
+        "--shallow",
+        action="store_true",
+        help="Só as primeiras 3 páginas (smoke rápido)",
+    )
+
+    p_probe = sub.add_parser("probe-cost", help="Produto → aba Custos → evidence")
+    p_probe.add_argument("--product-id", default=None)
+    p_probe.add_argument("--headed", action="store_true")
 
     args = parser.parse_args()
     settings = Settings.from_env()
@@ -52,21 +76,47 @@ def main() -> int:
         print(json.dumps({"ok": True, "state": str(path)}, ensure_ascii=False, indent=2))
         return 0
 
+    if args.cmd == "probe-system":
+        if not has_storage_state(settings.data_dir):
+            return _need_state(settings.data_dir)
+        evidence = probe_system(
+            settings.data_dir,
+            headless=not args.headed,
+            shallow=args.shallow,
+        )
+        pages = evidence.get("pages") or []
+        print(
+            json.dumps(
+                {
+                    "ok": evidence.get("ok"),
+                    "path": evidence.get("path"),
+                    "nav_count": len(evidence.get("nav_labels") or []),
+                    "nav_links": len(evidence.get("nav_links") or []),
+                    "pages_ok": evidence.get("pages_ok"),
+                    "pages_total": evidence.get("pages_total"),
+                    "domains_seen": evidence.get("domains_seen"),
+                    "pages": [
+                        {
+                            "key": p.get("key"),
+                            "ok": p.get("ok"),
+                            "title": p.get("page_title"),
+                            "tabs": (p.get("tabs") or [])[:8],
+                            "table_headers": (p.get("table_headers") or [])[:10],
+                        }
+                        for p in pages
+                    ],
+                    "error": evidence.get("error"),
+                    "login_wall": evidence.get("login_wall"),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if evidence.get("ok") else 3
+
     if args.cmd == "probe-cost":
         if not has_storage_state(settings.data_dir):
-            print(
-                json.dumps(
-                    {
-                        "ok": False,
-                        "error": "storage_state_missing",
-                        "state": str(storage_state_path(settings.data_dir)),
-                        "hint": "python scripts/run_discovery_ui.py login",
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                )
-            )
-            return 2
+            return _need_state(settings.data_dir)
         evidence = probe_product_costs(
             settings.data_dir,
             product_id=args.product_id,
