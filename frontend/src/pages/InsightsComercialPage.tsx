@@ -407,7 +407,7 @@ export function InsightsComercialPage() {
             Comercial inteligente
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Funil por status de pedido · canais no lugar de vendedores · mesma verdade do Business.
+            Funil por status de pedido · canais no lugar de vendedores · mesmo motor do knowt.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -421,7 +421,7 @@ export function InsightsComercialPage() {
             fontWeight={600}
             sx={{ fontSize: '0.85rem' }}
           >
-            Ver no Business →
+            Ver detalhes →
           </Link>
         </Stack>
       </Stack>

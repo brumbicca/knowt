@@ -195,7 +195,7 @@ export function InsightsAgendaColumn() {
           <Box sx={{ textAlign: 'center', mt: 1.5 }}>
             <Link
               component={RouterLink}
-              to="/agenda"
+              to="/insights/agenda"
               underline="hover"
               fontWeight={600}
               sx={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
@@ -257,7 +257,7 @@ export function InsightsAgendaColumn() {
           <Box sx={{ textAlign: 'center', mt: 1.5 }}>
             <Link
               component={RouterLink}
-              to="/agenda"
+              to="/insights/agenda"
               underline="hover"
               fontWeight={600}
               sx={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
@@ -310,7 +310,7 @@ export function InsightsAgendaColumn() {
           <Box sx={{ textAlign: 'center', mt: 1.5 }}>
             <Link
               component={RouterLink}
-              to="/agenda"
+              to="/insights/agenda"
               underline="hover"
               fontWeight={600}
               sx={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
@@ -324,13 +324,13 @@ export function InsightsAgendaColumn() {
 
       <Button
         component={RouterLink}
-        to="/agenda"
+        to="/insights/agenda"
         variant="outlined"
         size="small"
         fullWidth
         sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
       >
-        Abrir Agenda no Business
+        Abrir Agenda
       </Button>
     </Stack>
   )

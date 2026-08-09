@@ -304,7 +304,7 @@ export function InsightsHomePage() {
   return (
     <DomainPageShell
       title="Insights"
-      subtitle="Resumo dos principais insights · mesma verdade do Business"
+      subtitle="Resumo dos principais insights · mesmo motor do knowt"
       loading={loading && !data}
       error={error}
       onRetry={refresh}

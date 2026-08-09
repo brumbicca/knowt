@@ -14,10 +14,8 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
-import { useLocation, useNavigate } from 'react-router-dom'
 import { deleteFonte, updateFonte, type BiSource } from '../api/bridge'
 import { useBiSource } from '../state/BiSourceContext'
-import { isInsightsPath } from './DomainNav'
 import { Hicon } from './Hicon'
 import { OnboardingWizard } from './OnboardingWizard'
 
@@ -784,11 +782,15 @@ function DeleteSourceDialog({
 
 /** Barra Fiesta | fontes registadas | + Adicionar */
 export function SourceCardsBar() {
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
-  const lane = isInsightsPath(pathname) ? 'insights' : 'business'
-  const { sources, activeSourceId, setActiveSourceId, loading, isFiestaActive, refreshSources, replaceSource } =
-    useBiSource()
+  const {
+    sources,
+    activeSourceId,
+    setActiveSourceId,
+    loading,
+    isFiestaActive,
+    refreshSources,
+    replaceSource,
+  } = useBiSource()
   const [addOpen, setAddOpen] = useState(false)
   const [editSource, setEditSource] = useState<BiSource | null>(null)
   const [deleteSource, setDeleteSource] = useState<BiSource | null>(null)
@@ -864,63 +866,21 @@ export function SourceCardsBar() {
             </Tooltip>
           </Stack>
 
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="stretch"
-            sx={{ ml: { xs: 0, sm: 'auto' }, mt: { xs: 0.5, sm: 0 } }}
-          >
-            {(
-              [
-                {
-                  id: 'business' as const,
-                  label: 'Business',
-                  icon: 'bag' as const,
-                  title: 'Visão operacional — vendas, pedidos, margens',
-                },
-                {
-                  id: 'insights' as const,
-                  label: 'Insights',
-                  icon: 'graph' as const,
-                  title: 'Visão analítica — tendências e alertas',
-                },
-              ] as const
-            ).map((btn) => {
-              const selected = lane === btn.id
-              return (
-                <Tooltip key={btn.id} title={btn.title}>
-                  <Button
-                    variant={selected ? 'contained' : 'outlined'}
-                    color="primary"
-                    onClick={() => {
-                      if (btn.id === 'business') {
-                        if (lane !== 'business') navigate('/')
-                      } else if (lane !== 'insights') {
-                        navigate('/insights')
-                      }
-                    }}
-                    startIcon={<Hicon name={btn.icon} sx={{ fontSize: '1.05rem' }} />}
-                    sx={{
-                      height: 36,
-                      minWidth: { xs: 0, sm: 124 },
-                      px: { xs: 1.25, sm: 1.75 },
-                      borderRadius: '10px',
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      fontFamily: '"Outfit", sans-serif',
-                      fontSize: '0.85rem',
-                      letterSpacing: 0.02,
-                      boxShadow: selected ? undefined : 'none',
-                      borderWidth: selected ? undefined : 1.5,
-                      alignSelf: 'center',
-                    }}
-                  >
-                    {btn.label}
-                  </Button>
-                </Tooltip>
-              )
-            })}
-          </Stack>
+          {/* Lane Business omitida no piloto knowt — só Insights (+ Agenda). */}
+          <Chip
+            size="small"
+            color="primary"
+            variant="outlined"
+            label="Insights"
+            sx={{
+              height: 36,
+              px: 1,
+              fontWeight: 700,
+              fontFamily: '"Outfit", sans-serif',
+              alignSelf: 'center',
+              borderRadius: '10px',
+            }}
+          />
         </Stack>
       </Box>
       <AddSourceDialog open={addOpen} onClose={() => setAddOpen(false)} />

@@ -296,6 +296,21 @@ def create_bi_bridge_blueprint(
             }
         )
 
+    @bp.get("/agenda/periodo")
+    def agenda_periodo():
+        return jsonify(
+            {
+                "ok": True,
+                "eventos": [],
+                "events": [],
+                "note": "Agenda local ainda sem backend persistente no piloto.",
+            }
+        )
+
+    @bp.get("/tarefas")
+    def tarefas():
+        return jsonify({"ok": True, "tarefas": [], "tasks": []})
+
     @bp.post("/assistant/chat")
     def assistant_chat():
         registry.load()

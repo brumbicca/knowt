@@ -34,9 +34,10 @@ export const BI_NAV_ALL: NavItem[] = [
   { to: '/clientes', label: 'Clientes', icon: 'group' },
 ]
 
-/** Abas Insights — PDF 12–21 adaptado ao ecommerce Fiesta (sem PCP/RH industriais). */
+/** Abas Insights — knowt piloto (sem lane Business). */
 export const INSIGHTS_NAV_ALL: NavItem[] = [
   { to: '/insights', label: 'Insights', exact: true, icon: 'activity' },
+  { to: '/insights/agenda', label: 'Agenda', icon: 'clock' },
   { to: '/insights/alertas', label: 'Alertas', icon: 'report' },
   { to: '/insights/prioridades', label: 'Prioridades', icon: 'document' },
   { to: '/insights/comercial', label: 'Comercial', icon: 'buy' },
@@ -165,7 +166,7 @@ export function DomainNav() {
   const theme = useTheme()
   const compact = useMediaQuery(theme.breakpoints.down('md'))
   const { pathname } = useLocation()
-  const navAll = isInsightsPath(pathname) ? INSIGHTS_NAV_ALL : BI_NAV_ALL
+  const navAll = INSIGHTS_NAV_ALL
   const barRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState(navAll.length)
   const [moreEl, setMoreEl] = useState<null | HTMLElement>(null)

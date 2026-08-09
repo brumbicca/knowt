@@ -308,7 +308,7 @@ export function InsightsPrioridadesPage() {
         prazoDate: due,
         status,
         source: 'tarefa',
-        href: '/agenda',
+        href: '/insights/agenda',
       })
     }
 
@@ -474,7 +474,7 @@ export function InsightsPrioridadesPage() {
             Prioridades da semana
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Metas, status e distribuição por área — mesma verdade do Business / Agenda.
+            Metas, status e distribuição por área — mesmo motor do knowt / Agenda.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -483,7 +483,7 @@ export function InsightsPrioridadesPage() {
           </Button>
           <Link
             component={RouterLink}
-            to="/agenda"
+            to="/insights/agenda"
             underline="hover"
             fontWeight={600}
             sx={{ fontSize: '0.85rem' }}
@@ -730,7 +730,7 @@ export function InsightsPrioridadesPage() {
               <Box sx={{ textAlign: 'center', mt: 1.5 }}>
                 <Link
                   component={RouterLink}
-                  to="/agenda"
+                  to="/insights/agenda"
                   underline="hover"
                   fontWeight={600}
                   sx={{ fontSize: '0.85rem' }}
@@ -763,7 +763,7 @@ export function InsightsPrioridadesPage() {
                 detail:
                   gapSemNf > 0
                     ? `Há ${gapSemNf} pedidos sem NF — cruzar com alertas e Agenda.`
-                    : 'Plano da semana com tarefas, alertas e leitura da IA — mesma verdade do Business.',
+                    : 'Plano da semana com tarefas, alertas e leitura da IA — mesmo motor do knowt.',
                 recommendations: [
                   {
                     title: 'Ver alertas',

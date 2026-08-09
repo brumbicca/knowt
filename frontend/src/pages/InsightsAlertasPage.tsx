@@ -323,7 +323,7 @@ export function InsightsAlertasPage() {
             fontWeight={600}
             sx={{ fontSize: '0.85rem' }}
           >
-            Ver no Business →
+            Ver detalhes →
           </Link>
         </Stack>
       </Stack>

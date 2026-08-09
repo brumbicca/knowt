@@ -445,7 +445,7 @@ export function InsightsFinanceiroPage() {
             Financeiro inteligente
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Visão da saúde financeira marketplace — mesma verdade do Business (sem ERP de caixa bancário).
+            Visão da saúde financeira marketplace — mesmo motor do knowt (sem ERP de caixa bancário).
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -459,7 +459,7 @@ export function InsightsFinanceiroPage() {
             fontWeight={600}
             sx={{ fontSize: '0.85rem' }}
           >
-            Ver no Business →
+            Ver detalhes →
           </Link>
         </Stack>
       </Stack>

@@ -59,7 +59,7 @@ const PAGE_DOMAINS: Array<{
   { path: '/fiscal', dominio: 'fiscal', label: 'fiscal' },
   { path: '/operacoes', dominio: 'operacoes', label: 'operações' },
   { path: '/clientes', dominio: 'clientes', label: 'clientes' },
-  { path: '/agenda', dominio: 'agenda', label: 'agenda' },
+  { path: '/insights/agenda', dominio: 'agenda', label: 'agenda' },
   { path: '/', dominio: 'home', label: 'negócio' },
 ]
 
