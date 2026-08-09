@@ -428,6 +428,14 @@ export type InsightPlano = {
   fonte?: string
 }
 
+export type InsightSituacaoBreakdown = {
+  situacao: string
+  api?: string
+  ok?: boolean
+  total_orders?: number | null
+  reason_code?: string
+}
+
 export type InsightResumo = {
   dominio: InsightDominio
   dominio_label?: string
@@ -443,6 +451,10 @@ export type InsightResumo = {
   confianca?: { nivel?: 'alta' | 'media' | 'baixa'; motivo?: string }
   texto?: string
   fonte?: string
+  breakdown?: {
+    by_situacao?: InsightSituacaoBreakdown[]
+    cached?: boolean
+  } | null
 }
 
 /** «Insight da IA»: mesma leitura que o Hermes dá no chat (bridge `/insights/resumo`). */

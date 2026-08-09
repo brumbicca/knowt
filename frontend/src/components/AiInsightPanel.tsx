@@ -218,6 +218,40 @@ export function AiInsightPanel({
           </Typography>
         ) : null}
 
+        {data?.breakdown?.by_situacao?.some(
+          (row) => row.ok && Number(row.total_orders || 0) > 0,
+        ) ? (
+          <Box sx={{ mb: 1.25 }}>
+            <Typography
+              variant="overline"
+              fontWeight={800}
+              letterSpacing={0.08}
+              color="text.secondary"
+              sx={{ display: 'block', mb: 0.75 }}
+            >
+              Pedidos por situação
+            </Typography>
+            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+              {data.breakdown.by_situacao
+                .filter((row) => row.ok && Number(row.total_orders || 0) > 0)
+                .map((row) => (
+                  <Chip
+                    key={row.situacao}
+                    size="small"
+                    label={`${row.situacao} · ${row.total_orders}`}
+                    variant="outlined"
+                    sx={{
+                      height: 22,
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      borderColor: alpha(theme.palette.primary.main, 0.35),
+                    }}
+                  />
+                ))}
+            </Stack>
+          </Box>
+        ) : null}
+
         <Typography
           variant="overline"
           fontWeight={800}

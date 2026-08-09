@@ -7,12 +7,9 @@ from typing import Any, Dict, List, Optional
 from knowt.chat_actions import try_chat_action
 from knowt.enforcement import EnforcementResult, enforce
 from knowt.order_id import extract_order_id
+from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import parse_period
-from knowt.situacao import (
-    BREAKDOWN_SITUACOES,
-    parse_situacao,
-    wants_situacao_breakdown,
-)
+from knowt.situacao import parse_situacao, wants_situacao_breakdown
 from knowt.sources import SourceRegistry
 from knowt.tiny_order_detail import fetch_order_detail
 from knowt.tiny_orders import count_orders_in_period, fetch_orders_page
@@ -38,31 +35,6 @@ def _format_previews(previews: List[Dict[str, Any]], *, limit: int = 5) -> str:
             bits.append(str(row["data_pedido"]))
         parts.append(" · ".join(bits))
     return "; ".join(parts) if parts else "(nenhum nesta página)"
-
-
-def _breakdown_por_situacao(
-    token: str,
-    *,
-    data_inicial: str,
-    data_final: str,
-) -> Dict[str, Any]:
-    rows: List[Dict[str, Any]] = []
-    for label, api_val in BREAKDOWN_SITUACOES:
-        counted = count_orders_in_period(
-            token,
-            data_inicial=data_inicial,
-            data_final=data_final,
-            situacao=api_val,
-        )
-        rows.append(
-            {
-                "situacao": label,
-                "ok": counted.ok,
-                "total_orders": counted.total_orders if counted.ok else None,
-                "reason_code": counted.reason_code,
-            }
-        )
-    return {"by_situacao": rows}
 
 
 def answer_chat(
@@ -171,16 +143,17 @@ def answer_chat(
             sample_txt = f" Amostra de ids: {sample}." if sample else ""
 
             if want_break:
-                br = _breakdown_por_situacao(token, data_inicial=d0, data_final=d1)
+                br = breakdown_por_situacao(token, data_inicial=d0, data_final=d1)
                 out["data"]["breakdown"] = br
-                bits: List[str] = []
-                for row in br["by_situacao"]:
-                    if row["ok"] and row["total_orders"] is not None:
-                        if row["total_orders"] > 0:
-                            bits.append(f"**{row['situacao']}** {row['total_orders']}")
-                    else:
-                        bits.append(f"{row['situacao']} (falhou: {row['reason_code']})")
-                br_txt = "; ".join(bits) if bits else "(sem pedidos nas situações amostradas)"
+                br_txt = format_breakdown_short(br, max_items=10)
+                # também listar falhas
+                fails = [
+                    f"{row['situacao']} (falhou: {row['reason_code']})"
+                    for row in br.get("by_situacao") or []
+                    if not row.get("ok")
+                ]
+                if fails:
+                    br_txt = f"{br_txt}; " + "; ".join(fails) if br_txt else "; ".join(fails)
                 out["answer"] = (
                     f"Fonte `{source_id}` · `orders.list` ({enf.mode}) · período "
                     f"**{period.label}** ({d0} a {d1}): "

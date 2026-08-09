@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request
 from knowt.agenda_store import add_event, google_status as agenda_google_status, list_events
 from knowt.answers import answer_chat
 from knowt.audit import append_answer_audit, audit_path_for
+from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import Period, today_br
 from knowt.sources import SourceRegistry
 from knowt.tasks_store import (
@@ -225,16 +226,42 @@ def create_bi_bridge_blueprint(
         dominio = (request.args.get("dominio") or "geral").strip()
         counted = count_orders_in_period(_token(), data_inicial=d0, data_final=d1)
         n = counted.total_orders if counted.ok else 0
+        br = None
+        br_txt = ""
+        if counted.ok:
+            try:
+                br = breakdown_por_situacao(_token(), data_inicial=d0, data_final=d1)
+                br_txt = format_breakdown_short(br, max_items=8)
+            except Exception:
+                br = None
         leitura = (
             f"No período **{period.label}** a Tiny reporta **{n}** pedido(s) "
-            f"(capability `orders.list`, contagem {counted.method or 'n/d'}). "
-            "Receita/margem ainda não estão live no knowt — não inventamos valores."
+            f"(capability `orders.list`, contagem {counted.method or 'n/d'})."
+            + (f" Por situação: {br_txt}." if br_txt else "")
+            + " Receita/margem ainda não estão live no knowt — não inventamos valores."
             if counted.ok
             else (
                 f"Não consegui contar pedidos ({counted.reason_code}). "
                 "Sem inventar números."
             )
         )
+        achados = [
+            {
+                "titulo": "Cobertura knowt",
+                "detalhe": "live: orders.list + orders.detail · blocked: sales.summary / margem",
+                "tipo": "info",
+            }
+        ]
+        if br and br.get("by_situacao"):
+            for row in br["by_situacao"]:
+                if row.get("ok") and row.get("total_orders"):
+                    achados.append(
+                        {
+                            "titulo": f"Pedidos · {row['situacao']}",
+                            "detalhe": f"{row['total_orders']} no período",
+                            "tipo": "info",
+                        }
+                    )
         return jsonify(
             {
                 "dominio": dominio,
@@ -249,13 +276,8 @@ def create_bi_bridge_blueprint(
                     "detalhe": f"{n} pedido(s)" if counted.ok else "indisponível",
                     "tipo": "info",
                 },
-                "achados": [
-                    {
-                        "titulo": "Cobertura knowt",
-                        "detalhe": "live: orders.list + orders.detail · blocked: sales.summary / margem",
-                        "tipo": "info",
-                    }
-                ],
+                "achados": achados,
+                "breakdown": br,
                 "recomendacoes": [
                     {
                         "titulo": "Perguntar no chat",

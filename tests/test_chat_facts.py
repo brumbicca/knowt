@@ -44,15 +44,16 @@ def test_answer_breakdown_esta_semana(tmp_path: Path, monkeypatch):
         )
 
     with patch("knowt.answers.count_orders_in_period", side_effect=fake_count):
-        with patch(
-            "knowt.period.today_br",
-            return_value=__import__("datetime").date(2026, 8, 8),
-        ):
-            out = answer_chat(
-                reg,
-                message="resumo de pedidos esta semana",
-                source_id="tinyerp",
-            )
+        with patch("knowt.order_breakdown.count_orders_in_period", side_effect=fake_count):
+            with patch(
+                "knowt.period.today_br",
+                return_value=__import__("datetime").date(2026, 8, 8),
+            ):
+                out = answer_chat(
+                    reg,
+                    message="resumo de pedidos esta semana",
+                    source_id="tinyerp",
+                )
     assert out["enforcement"]["mode"] == "fact"
     assert "100" in out["answer"]
     assert "aprovado" in out["answer"]
