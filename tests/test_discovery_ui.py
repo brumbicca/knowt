@@ -56,11 +56,15 @@ def test_parse_cost_pairs_from_body_text():
 
 
 def test_clean_texts_and_targets():
-    from knowt.discovery_ui import TINY_SYSTEM_TARGETS, _clean_texts
+    from knowt.discovery_ui import MARGIN_REPORT_TARGETS, TINY_SYSTEM_TARGETS, _clean_texts
 
     assert len(TINY_SYSTEM_TARGETS) >= 6
     keys = {t["key"] for t in TINY_SYSTEM_TARGETS}
     assert "pedidos_venda" in keys
     assert "produtos" in keys
+    assert {t["key"] for t in MARGIN_REPORT_TARGETS} == {
+        "avaliacao_margem",
+        "margem_contribuicao",
+    }
     cleaned = _clean_texts(["  Vendas  ", "Vendas", "x", "Pedidos de venda"])
     assert cleaned == ["Vendas", "Pedidos de venda"]

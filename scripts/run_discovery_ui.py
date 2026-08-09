@@ -20,9 +20,10 @@ if env_path.is_file():
         os.environ.setdefault(k.strip(), v.strip())
 
 from knowt.config import Settings  # noqa: E402
-from knowt.discovery_ui import (  # noqa: E402
+from knowt.discovery_ui import (
     has_storage_state,
     login_interactive,
+    probe_margin_reports,
     probe_product_costs,
     probe_system,
     storage_state_path,
@@ -62,6 +63,12 @@ def main() -> int:
         action="store_true",
         help="Só as primeiras 3 páginas (smoke rápido)",
     )
+
+    p_marg = sub.add_parser(
+        "probe-margin-reports",
+        help="Abre relatórios Tiny de margem (Avaliação + Contribuição)",
+    )
+    p_marg.add_argument("--headed", action="store_true")
 
     p_probe = sub.add_parser("probe-cost", help="Produto → aba Custos → evidence")
     p_probe.add_argument("--product-id", default=None)
@@ -104,6 +111,42 @@ def main() -> int:
                             "table_headers": (p.get("table_headers") or [])[:10],
                         }
                         for p in pages
+                    ],
+                    "error": evidence.get("error"),
+                    "login_wall": evidence.get("login_wall"),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if evidence.get("ok") else 3
+
+    if args.cmd == "probe-margin-reports":
+        if not has_storage_state(settings.data_dir):
+            return _need_state(settings.data_dir)
+        evidence = probe_margin_reports(
+            settings.data_dir,
+            headless=not args.headed,
+        )
+        print(
+            json.dumps(
+                {
+                    "ok": evidence.get("ok"),
+                    "path": evidence.get("path"),
+                    "hub_report_names": (evidence.get("hub_report_names") or [])[:20],
+                    "reports_ok": evidence.get("reports_ok"),
+                    "reports": [
+                        {
+                            "key": r.get("key"),
+                            "ok": r.get("ok"),
+                            "clicked": r.get("clicked"),
+                            "title": r.get("page_title"),
+                            "url": r.get("url"),
+                            "filters": (r.get("filter_labels") or [])[:15],
+                            "table_headers": (r.get("table_headers") or [])[:15],
+                            "error": r.get("error"),
+                        }
+                        for r in (evidence.get("reports") or [])
                     ],
                     "error": evidence.get("error"),
                     "login_wall": evidence.get("login_wall"),

@@ -814,6 +814,267 @@ def probe_system(
     return _persist_evidence(data_dir, out, kind="ui_system_map")
 
 
+MARGIN_REPORT_TARGETS = (
+    {
+        "key": "avaliacao_margem",
+        "match": "avaliação de margem",
+        "label": "Tiny - Avaliação de margem",
+    },
+    {
+        "key": "margem_contribuicao",
+        "match": "margem de cont",  # UI typo Contibuição
+        "label": "Margem de Contribuição",
+    },
+)
+
+
+def _collect_filter_labels(page, *, limit: int = 40) -> List[str]:
+    texts: List[str] = []
+    for sel in (
+        "label",
+        "[class*='filtro'] label",
+        "[class*='filter'] label",
+        "form label",
+        ".form-group label",
+        "th",
+        "[role='columnheader']",
+    ):
+        try:
+            locs = page.locator(sel)
+            n = min(locs.count(), 40)
+            for i in range(n):
+                try:
+                    t = locs.nth(i).inner_text(timeout=400)
+                except Exception:
+                    continue
+                if t:
+                    texts.append(t)
+        except Exception:
+            continue
+    return _clean_texts(texts, limit=limit)
+
+
+def probe_margin_reports(
+    data_dir: Path,
+    *,
+    source_id: str = "tinyerp",
+    headless: bool = True,
+    timeout_ms: int = 60_000,
+) -> Dict[str, Any]:
+    """Abre relatórios de margem no módulo Vendas → evidência (sem publish)."""
+    from playwright.sync_api import sync_playwright
+
+    state = storage_state_path(data_dir, source_id)
+    hub_url = "https://erp.olist.com/relatorios_sistema?id=3"
+    out: Dict[str, Any] = {
+        "version": 1,
+        "kind": "ui_margin_reports",
+        "quality": "observation",
+        "at": _now_iso(),
+        "source_id": source_id,
+        "hub_url": hub_url,
+        "ok": False,
+        "login_wall": False,
+        "state_path": str(state),
+        "reports": [],
+        "gates_note": (
+            "Relatórios oficiais observados — useful para reconciliar CMV; "
+            "não altera cost_field nem publica margins.summary."
+        ),
+        "error": None,
+        "hint": None,
+    }
+
+    if not has_storage_state(data_dir, source_id):
+        out["error"] = "storage_state_missing"
+        out["hint"] = "python scripts/run_discovery_ui.py login"
+        return _persist_evidence(data_dir, out, kind="ui_margin_reports")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=headless)
+            context = browser.new_context(locale="pt-BR", storage_state=str(state))
+            page = context.new_page()
+            page.goto(hub_url, wait_until="domcontentloaded", timeout=timeout_ms)
+            page.wait_for_timeout(1800)
+            title = (page.title() or "").strip()
+            cur = page.url
+            body = ""
+            try:
+                body = page.inner_text("body")[:400]
+            except Exception:
+                body = ""
+            if _looks_like_login(cur, title, body):
+                out["login_wall"] = True
+                out["error"] = "login_wall"
+                out["hint"] = "Renovar: python scripts/run_discovery_ui.py login"
+                browser.close()
+                return _persist_evidence(data_dir, out, kind="ui_margin_reports")
+
+            # inventário de nomes visíveis no hub
+            hub_names = _collect_tabs(page, limit=40)
+            out["hub_report_names"] = hub_names
+            reports: List[Dict[str, Any]] = []
+
+            for target in MARGIN_REPORT_TARGETS:
+                entry: Dict[str, Any] = {
+                    "key": target["key"],
+                    "label": target["label"],
+                    "match": target["match"],
+                    "ok": False,
+                    "clicked": False,
+                    "url": None,
+                    "page_title": None,
+                    "headings": [],
+                    "table_headers": [],
+                    "filter_labels": [],
+                    "body_preview": None,
+                    "error": None,
+                }
+                try:
+                    # sempre voltar ao hub antes de cada relatório
+                    page.goto(hub_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                    page.wait_for_timeout(1200)
+                    clicked = False
+                    # preferir link/texto com o nome do relatório
+                    candidates = [
+                        page.get_by_role("link", name=re.compile(target["match"], re.I)),
+                        page.get_by_text(re.compile(target["match"], re.I)),
+                    ]
+                    for cand in candidates:
+                        try:
+                            loc = cand.first
+                            if loc.count() == 0:
+                                continue
+                            loc.click(timeout=5000)
+                            clicked = True
+                            break
+                        except Exception:
+                            continue
+                    entry["clicked"] = clicked
+                    if not clicked:
+                        entry["error"] = "report_link_not_found"
+                        reports.append(entry)
+                        continue
+                    page.wait_for_timeout(4000)
+                    # SPA de relatórios personalizados: esperar botão / texto de filtros
+                    for wait_sel in (
+                        "text=/configurando os filtros/i",
+                        "text=/gerar relatório/i",
+                        "button:has-text('gerar')",
+                        "text=/filtro/i",
+                    ):
+                        try:
+                            page.locator(wait_sel).first.wait_for(timeout=4000)
+                            break
+                        except Exception:
+                            continue
+                    page.wait_for_timeout(1500)
+                    entry["url"] = page.url
+                    entry["page_title"] = (page.title() or "").strip()
+                    entry["headings"] = _collect_headings(page)
+                    entry["table_headers"] = _collect_table_headers(page)
+                    entry["filter_labels"] = _collect_filter_labels(page)
+                    # Extracção extra da SPA (placeholders + textos próximos a inputs)
+                    # Abrir painel «Filtros e busca» se existir
+                    for filt_sel in (
+                        "text=/^Filtros e busca$/i",
+                        "button:has-text('Filtros')",
+                        "text=/Filtros e busca/i",
+                    ):
+                        try:
+                            fl = page.locator(filt_sel).first
+                            if fl.count():
+                                fl.click(timeout=3000)
+                                page.wait_for_timeout(1200)
+                                break
+                        except Exception:
+                            continue
+                    try:
+                        spa = page.evaluate(
+                            """() => {
+                              const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+                              const labels = [];
+                              for (const el of Array.from(document.querySelectorAll('label, .label, [class*=Label], [class*=filtro] span, [class*=filter] span'))) {
+                                const t = norm(el.innerText);
+                                if (t && t.length > 1 && t.length < 80) labels.push(t);
+                              }
+                              const placeholders = [];
+                              for (const el of Array.from(document.querySelectorAll('input, select, textarea'))) {
+                                const ph = norm(el.getAttribute('placeholder'));
+                                const name = norm(el.getAttribute('name') || el.getAttribute('aria-label'));
+                                const aria = norm(el.getAttribute('aria-labelledby'));
+                                if (ph) placeholders.push(ph);
+                                if (name) placeholders.push(name);
+                              }
+                              // textos em drawers/side panels
+                              const panels = Array.from(document.querySelectorAll('[class*=drawer], [class*=Drawer], [class*=sidebar], [class*=panel], [role=dialog], aside'));
+                              const panelText = panels.map(el => norm(el.innerText)).filter(Boolean).join(' | ').slice(0, 1500);
+                              const buttons = Array.from(document.querySelectorAll('button, a.btn, [role=button]'))
+                                .map(el => norm(el.innerText)).filter(Boolean).slice(0, 40);
+                              const body = norm(document.body.innerText).slice(0, 1500);
+                              return { labels: labels.slice(0, 60), placeholders: placeholders.slice(0, 40), buttons, panelText, body };
+                            }"""
+                        )
+                        entry["spa"] = {
+                            "labels": _clean_texts(list(spa.get("labels") or []), limit=40),
+                            "placeholders": _clean_texts(
+                                list(spa.get("placeholders") or []), limit=30
+                            ),
+                            "buttons": _clean_texts(list(spa.get("buttons") or []), limit=25),
+                            "panel_preview": (spa.get("panelText") or "")[:400] or None,
+                        }
+                        if spa.get("body"):
+                            entry["body_preview"] = re.sub(
+                                r"\s+", " ", spa["body"]
+                            ).strip()[:500]
+                        merged = list(entry.get("filter_labels") or [])
+                        merged.extend(entry["spa"].get("labels") or [])
+                        merged.extend(entry["spa"].get("placeholders") or [])
+                        # tokens úteis do painel
+                        if spa.get("panelText"):
+                            for tok in re.split(r"[|\n]", spa["panelText"]):
+                                tok = tok.strip()
+                                if 2 < len(tok) < 60:
+                                    merged.append(tok)
+                        entry["filter_labels"] = _clean_texts(merged, limit=50)
+                    except Exception:
+                        try:
+                            b = page.inner_text("body")[:900]
+                            entry["body_preview"] = re.sub(r"\s+", " ", b).strip()[:400]
+                        except Exception:
+                            entry["body_preview"] = None
+                    entry["ok"] = not _looks_like_login(
+                        entry["url"] or "",
+                        entry["page_title"] or "",
+                        entry["body_preview"] or "",
+                    )
+                    if not entry["ok"]:
+                        entry["error"] = "login_or_empty"
+                except Exception as exc:
+                    entry["error"] = f"{type(exc).__name__}:{exc}"[:180]
+                reports.append(entry)
+
+            browser.close()
+            out["reports"] = reports
+            out["ok"] = any(r.get("ok") for r in reports)
+            out["reports_ok"] = sum(1 for r in reports if r.get("ok"))
+            out["reports_total"] = len(reports)
+            out["findings"] = [
+                "Relatórios personalizados: Avaliação de margem → #/view/27",
+                "Relatórios personalizados: Margem de Contribuição → #/view/17",
+                "UI exige configurar filtros antes de gerar (sem tabela até então)",
+                "Ações observadas: personalizar relatório, gerar relatório, Filtros e busca",
+                "Não extrair CMV daqui sem cost_field + período alinhado ao probe",
+            ]
+            if not out["ok"]:
+                out["error"] = "margin_reports_not_opened"
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"probe_exception:{type(exc).__name__}:{exc}"
+
+    return _persist_evidence(data_dir, out, kind="ui_margin_reports")
+
+
 def _persist_evidence(
     data_dir: Path,
     evidence: Dict[str, Any],
@@ -843,6 +1104,16 @@ def load_latest_product_cost_probe(data_dir: Path) -> Optional[Dict[str, Any]]:
 
 def load_latest_system_map(data_dir: Path) -> Optional[Dict[str, Any]]:
     path = evidence_dir(data_dir) / "ui_system_map_latest.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def load_latest_margin_reports(data_dir: Path) -> Optional[Dict[str, Any]]:
+    path = evidence_dir(data_dir) / "ui_margin_reports_latest.json"
     if not path.is_file():
         return None
     try:
