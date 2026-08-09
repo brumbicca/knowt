@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -186,11 +187,17 @@ export function InsightsHomePage() {
 
   const ticketMedio = data && data.pedidos > 0 ? data.vendas / data.pedidos : 0
   const cobertura = data?.coberturaPct
+  /** knowt: há pedidos Tiny mas sales/margem ainda unavailable — não pintar R$ 0 como se fossem fatos. */
+  const financeLive = Boolean(
+    data && Number(data.pedidos || 0) > 0 && Number(data.vendas || 0) > 0,
+  )
   const gapSemNf = isFiestaActive ? Number(ops?.margin_gap?.sem_nf || 0) : 0
   const alertsCrit = isFiestaActive
     ? (ops?.alerts || []).filter((a) => a.severity === 'error' || a.severity === 'warning')
     : []
-  const actCount = alertsCrit.length + (gapSemNf > 0 ? 1 : 0) + (cobertura != null && cobertura < 90 ? 1 : 0)
+  const actCount = financeLive
+    ? alertsCrit.length + (gapSemNf > 0 ? 1 : 0) + (cobertura != null && cobertura < 90 ? 1 : 0)
+    : Math.max(1, alertsCrit.length)
 
   const ganharValor =
     data?.deltaVendasPct != null && data.deltaVendasPct > 0 && data.prevVendas
@@ -203,6 +210,9 @@ export function InsightsHomePage() {
       : data?.taxas || 0
 
   const focusThemes = useMemo(() => {
+    if (!financeLive) {
+      return ['Pedidos Tiny', 'Situações', 'Chat']
+    }
     const themes: string[] = []
     if (cobertura != null && cobertura < 95) themes.push('Margem/CMV')
     if (gapSemNf > 0) themes.push('Notas fiscais')
@@ -210,7 +220,7 @@ export function InsightsHomePage() {
     if (alertsCrit.some((a) => /sync|upseller/i.test(`${a.title} ${a.detail}`))) themes.push('Sync')
     if (!themes.length) themes.push('Receita', 'Margem', 'Pedidos')
     return themes.slice(0, 3)
-  }, [cobertura, gapSemNf, data?.deltaVendasPct, alertsCrit])
+  }, [financeLive, cobertura, gapSemNf, data?.deltaVendasPct, alertsCrit])
 
   const radarData = useMemo((): RadarAxisPoint[] => {
     if (!data) return []
@@ -295,9 +305,65 @@ export function InsightsHomePage() {
   }, [data, cobertura])
 
   const perfLabel =
-    data?.deltaVendasPct != null
-      ? `${data.deltaVendasPct > 0 ? '+' : ''}${data.deltaVendasPct.toFixed(1)}%`
-      : '—'
+    !financeLive
+      ? 'n/d'
+      : data?.deltaVendasPct != null
+        ? `${data.deltaVendasPct > 0 ? '+' : ''}${data.deltaVendasPct.toFixed(1)}%`
+        : '—'
+
+  const desempenhoRows = financeLive
+    ? ([
+        {
+          label: 'Vendas',
+          value: data?.vendasFmt || '—',
+          delta: data?.deltaVendasPct,
+          spark: sparkVendas,
+        },
+        {
+          label: 'Líquido',
+          value: data?.liquidoFmt || '—',
+          delta: null as number | null,
+          spark: sparkLiquido,
+        },
+        {
+          label: 'Margem',
+          value: data?.margemFmt || '—',
+          delta: null as number | null,
+          spark: sparkVendas,
+        },
+        {
+          label: 'Pedidos',
+          value: data ? String(data.pedidos) : '—',
+          delta: data?.deltaPedidosPct ?? null,
+          spark: sparkPedidos,
+        },
+        {
+          label: 'Cobertura NF',
+          value: cobertura != null ? `${cobertura.toFixed(0)}%` : '—',
+          delta: null as number | null,
+          spark: sparkPedidos,
+        },
+      ] as const)
+    : ([
+        {
+          label: 'Pedidos (Tiny)',
+          value: data ? String(data.pedidos) : '—',
+          delta: data?.deltaPedidosPct ?? null,
+          spark: sparkPedidos,
+        },
+        {
+          label: 'Receita',
+          value: 'n/d',
+          delta: null as number | null,
+          spark: [] as number[],
+        },
+        {
+          label: 'Margem',
+          value: 'n/d',
+          delta: null as number | null,
+          spark: [] as number[],
+        },
+      ] as const)
 
   const hourNow = nowSP().getHours()
 
@@ -385,32 +451,42 @@ export function InsightsHomePage() {
             <Grid container spacing={1.5}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <InsightHeroCard
-                  title="Onde ganhar dinheiro"
-                  value={fmtBrl(ganharValor)}
+                  title={financeLive ? 'Onde ganhar dinheiro' : 'Pedidos no período'}
+                  value={
+                    financeLive
+                      ? fmtBrl(ganharValor)
+                      : data
+                        ? String(data.pedidos)
+                        : '—'
+                  }
                   hint={
-                    data?.deltaVendasPct != null && data.deltaVendasPct > 0
-                      ? 'Potencial alinhado ao Δ de vendas vs período anterior'
-                      : 'Líquido do período — foco em canais e ticket'
+                    financeLive
+                      ? data?.deltaVendasPct != null && data.deltaVendasPct > 0
+                        ? 'Potencial alinhado ao Δ de vendas vs período anterior'
+                        : 'Líquido do período — foco em canais e ticket'
+                      : 'Volume Tiny ao vivo · sales.summary ainda não publicado'
                   }
                   icon="graph"
                   tone="gain"
                   to="/insights/comercial"
-                  cta="Ver oportunidades"
+                  cta={financeLive ? 'Ver oportunidades' : 'Ver Comercial'}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <InsightHeroCard
-                  title="Onde perder dinheiro"
-                  value={fmtBrl(perderValor)}
+                  title={financeLive ? 'Onde perder dinheiro' : 'Receita / margem'}
+                  value={financeLive ? fmtBrl(perderValor) : 'n/d'}
                   hint={
-                    gapSemNf > 0
-                      ? `${gapSemNf} pedidos sem NF · impacto estimado por ticket`
-                      : 'Taxas do período — monitorar frete e comissões'
+                    financeLive
+                      ? gapSemNf > 0
+                        ? `${gapSemNf} pedidos sem NF · impacto estimado por ticket`
+                        : 'Taxas do período — monitorar frete e comissões'
+                      : 'Bloqueado até validar sales.summary — zero verdade silenciosa'
                   }
                   icon="report"
                   tone="loss"
                   to="/insights/alertas"
-                  cta="Ver riscos"
+                  cta={financeLive ? 'Ver riscos' : 'Ver cobertura'}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
@@ -418,9 +494,11 @@ export function InsightsHomePage() {
                   title="Onde agir primeiro"
                   value={String(Math.max(actCount, 1))}
                   hint={
-                    isFiestaActive
-                      ? 'Iniciativas críticas (alertas, NF, cobertura)'
-                      : 'Prioridades com base em vendas, margem e canais desta fonte'
+                    financeLive
+                      ? isFiestaActive
+                        ? 'Iniciativas críticas (alertas, NF, cobertura)'
+                        : 'Prioridades com base em vendas, margem e canais desta fonte'
+                      : 'Usa o chat: «resumo de pedidos…» ou Agenda / tarefas'
                   }
                   icon="activity"
                   tone="act"
@@ -432,7 +510,11 @@ export function InsightsHomePage() {
                 <InsightHeroCard
                   title="Performance geral"
                   value={perfLabel}
-                  hint="vs período anterior · vendas válidas"
+                  hint={
+                    financeLive
+                      ? 'vs período anterior · vendas válidas'
+                      : 'Sem Δ de receita enquanto vendas não estiverem live'
+                  }
                   icon="buy"
                   tone="perf"
                   to="/insights/comercial"
@@ -492,40 +574,12 @@ export function InsightsHomePage() {
                 flexWrap="wrap"
                 sx={{ mb: 0 }}
               >
-                {(
-                  [
-                    {
-                      label: 'Vendas',
-                      value: data?.vendasFmt || '—',
-                      delta: data?.deltaVendasPct,
-                      spark: sparkVendas,
-                    },
-                    {
-                      label: 'Líquido',
-                      value: data?.liquidoFmt || '—',
-                      delta: null as number | null,
-                      spark: sparkLiquido,
-                    },
-                    {
-                      label: 'Margem',
-                      value: data?.margemFmt || '—',
-                      delta: null,
-                      spark: sparkVendas,
-                    },
-                    {
-                      label: 'Pedidos',
-                      value: data ? String(data.pedidos) : '—',
-                      delta: data?.deltaPedidosPct ?? null,
-                      spark: sparkPedidos,
-                    },
-                    {
-                      label: 'Cobertura NF',
-                      value: cobertura != null ? `${cobertura.toFixed(0)}%` : '—',
-                      delta: null,
-                      spark: sparkPedidos,
-                    },
-                  ] as const
-                ).map((row) => (
+                {(desempenhoRows as ReadonlyArray<{
+                  label: string
+                  value: string
+                  delta: number | null
+                  spark: readonly number[]
+                }>).map((row) => (
                   <Box
                     key={row.label}
                     sx={{
@@ -559,10 +613,12 @@ export function InsightsHomePage() {
                           </Typography>
                         ) : (
                           <Typography variant="caption" color="text.secondary">
-                            no período
+                            {row.value === 'n/d' ? 'ainda não live' : 'no período'}
                           </Typography>
                         )}
-                        <Sparkline values={[...row.spark]} height={26} />
+                        {row.spark.length ? (
+                          <Sparkline values={[...row.spark]} height={26} />
+                        ) : null}
                       </CardContent>
                     </Card>
                   </Box>
@@ -570,93 +626,101 @@ export function InsightsHomePage() {
               </Stack>
             </Box>
 
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 5 }}>
-                <Card sx={{ height: '100%', borderRadius: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Radar estratégico
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mb: 1 }}
-                    >
-                      Scores 0–100 a partir dos KPIs do filtro
-                    </Typography>
-                    <StrategyRadar data={radarData} height={240} />
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid size={{ xs: 12, md: 7 }}>
-                <Card sx={{ height: '100%', borderRadius: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Frentes que mais movimentam o resultado
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mb: 1.5 }}
-                    >
-                      Prioridade relativa — clique para aprofundar nos Insights
-                    </Typography>
-                    <Stack spacing={1.5}>
-                      {frentes.map((f) => (
-                        <Box key={f.name}>
-                          <Stack
-                            direction="row"
-                            justifyContent="space-between"
-                            alignItems="baseline"
-                            spacing={1}
-                            sx={{ mb: 0.5 }}
-                          >
-                            <Link
-                              component={RouterLink}
-                              to={f.to}
-                              underline="hover"
-                              fontWeight={600}
-                              color="inherit"
-                              variant="body2"
+            {financeLive ? (
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 5 }}>
+                  <Card sx={{ height: '100%', borderRadius: 2 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Radar estratégico
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mb: 1 }}
+                      >
+                        Scores 0–100 a partir dos KPIs do filtro
+                      </Typography>
+                      <StrategyRadar data={radarData} height={240} />
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid size={{ xs: 12, md: 7 }}>
+                  <Card sx={{ height: '100%', borderRadius: 2 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Frentes que mais movimentam o resultado
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mb: 1.5 }}
+                      >
+                        Prioridade relativa — clique para aprofundar nos Insights
+                      </Typography>
+                      <Stack spacing={1.5}>
+                        {frentes.map((f) => (
+                          <Box key={f.name}>
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="baseline"
+                              spacing={1}
+                              sx={{ mb: 0.5 }}
                             >
-                              {f.name}
-                              {f.hint ? (
-                                <Typography
-                                  component="span"
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ ml: 0.75 }}
-                                >
-                                  · {f.hint}
-                                </Typography>
-                              ) : null}
-                            </Link>
-                            <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                              {f.impacto} · {Math.round(f.pct)}%
-                            </Typography>
-                          </Stack>
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.max(4, Math.min(100, f.pct))}
-                            sx={{
-                              height: 8,
-                              borderRadius: 999,
-                              bgcolor: alpha(theme.palette.primary.main, 0.1),
-                              '& .MuiLinearProgress-bar': { borderRadius: 999 },
-                            }}
-                          />
-                        </Box>
-                      ))}
-                      {!frentes.length ? (
-                        <Typography variant="body2" color="text.secondary">
-                          Sem base no período — ajusta o filtro Dia / Semana / Mês.
-                        </Typography>
-                      ) : null}
-                    </Stack>
-                  </CardContent>
-                </Card>
+                              <Link
+                                component={RouterLink}
+                                to={f.to}
+                                underline="hover"
+                                fontWeight={600}
+                                color="inherit"
+                                variant="body2"
+                              >
+                                {f.name}
+                                {f.hint ? (
+                                  <Typography
+                                    component="span"
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ ml: 0.75 }}
+                                  >
+                                    · {f.hint}
+                                  </Typography>
+                                ) : null}
+                              </Link>
+                              <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                {f.impacto} · {Math.round(f.pct)}%
+                              </Typography>
+                            </Stack>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.max(4, Math.min(100, f.pct))}
+                              sx={{
+                                height: 8,
+                                borderRadius: 999,
+                                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                '& .MuiLinearProgress-bar': { borderRadius: 999 },
+                              }}
+                            />
+                          </Box>
+                        ))}
+                        {!frentes.length ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Sem base no período — ajusta o filtro Dia / Semana / Mês.
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
               </Grid>
-            </Grid>
+            ) : (
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                Radar e frentes financeiras ficam ocultos enquanto <strong>sales.summary</strong> /
+                margem não estiverem publicados. O painel à direita traz o breakdown Tiny por
+                situação — pergunta no chat «resumo de pedidos esta semana».
+              </Alert>
+            )}
 
             <Card
               sx={{
