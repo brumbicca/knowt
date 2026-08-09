@@ -5,8 +5,13 @@
 **Herdança:** espírito do Fiesta `docs/TINY_MARGEM_28c1_PACOTE_NEGOCIO.md` (§28c.1)
 
 **Smoke produção (2026-08-09):** probe live gravou evidence (~3375 ped. / 7d; soma valor só pág.1);
-`can_publish=false`; gates em falta; `sales.summary` permanece `unavailable`.
+`sales.summary` permanece `unavailable`.
 Bridge: `GET /api/bridge/sales/probe/latest` e `/insights/plano` (Bearer).
+
+**Gates parciais (2026-08-09):** VPS `sales_summary_gates.json` —
+`cost_field=defer`, `missing_cost_policy=block_metric`, `cmv_composition_ok=product_only`,
+`matches_official_report=unknown`. **`approved_to_publish=false`** (falta isso + `approver`
+após reconciliação com relatório oficial).
 
 ## O que o knowt faz agora
 

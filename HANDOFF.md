@@ -51,7 +51,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
 | Tiny `orders.list` | **live** — contagem por período, situação, **resumo/breakdown** por situação |
 | Tiny `orders.detail` | **live** — situação, cliente, itens, ecommerce, valor Tiny (sem CMV) |
-| Tiny `sales.summary` | ainda `unavailable` — probe+gates em `docs/SALES_SUMMARY_PACOTE.md` |
+| Tiny `sales.summary` | ainda `unavailable` — probe ok; gates parciais (falta `approved_to_publish`) · `docs/SALES_SUMMARY_PACOTE.md` |
 | Tiny `margins.summary` | `unavailable` (slot criado; sem publish) |
 | Evidence sales | `/root/knowt-data/evidence/sales_probe_*.json` + `sales_summary_gates.json` |
 | Data path | `/root/knowt-data` |
