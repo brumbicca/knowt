@@ -11,6 +11,19 @@ from typing import Any, Dict, List, Optional
 TINY_V2_ORDERS_URL = "https://api.tiny.com.br/api2/pedidos.pesquisa.php"
 
 
+def _is_empty_consulta(ret: dict) -> bool:
+    """Tiny devolve status=Erro + codigo 20 quando o filtro não acha pedidos."""
+    code = ret.get("codigo_erro")
+    try:
+        if int(code) == 20:
+            return True
+    except (TypeError, ValueError):
+        pass
+    errs = ret.get("erros")
+    blob = json.dumps(errs, ensure_ascii=False).lower() if errs else ""
+    return "não retornou registros" in blob or "nao retornou registros" in blob
+
+
 @dataclass
 class TinyOrderPreview:
     """Campos opcionais que a listagem Tiny pode trazer (sem inventar)."""
@@ -113,6 +126,19 @@ def fetch_orders_page(
 
     tinystatus = str(ret.get("status") or "").strip()
     if ret.get("erros") or ret.get("codigo_erro"):
+        if _is_empty_consulta(ret):
+            return TinyOrdersPage(
+                ok=True,
+                reason_code="OK",
+                http_status=status,
+                tinystatus=tinystatus or "Erro",
+                page=int(page),
+                total_pages=1,
+                order_count=0,
+                order_ids=[],
+                order_previews=[],
+                detail="empty_consulta",
+            )
         return TinyOrdersPage(
             ok=False,
             reason_code="TINY_API_ERROR",

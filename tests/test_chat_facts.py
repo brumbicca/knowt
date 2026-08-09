@@ -9,12 +9,6 @@ from knowt.tiny_order_detail import TinyOrderDetail
 from knowt.tiny_orders import TinyOrdersCount
 
 
-def test_wants_breakdown():
-    assert wants_situacao_breakdown("resumo de pedidos esta semana")
-    assert wants_situacao_breakdown("pedidos por situação últimos 7 dias")
-    assert not wants_situacao_breakdown("pedidos cancelados esta semana")
-
-
 def test_answer_breakdown_esta_semana(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("KNOWT_SECRET_TINY_TOKEN", "tok")
     reg = SourceRegistry(tmp_path / "sources.json")

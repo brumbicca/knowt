@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from knowt.tiny_orders import TinyOrdersPage, count_orders_in_period
+from knowt.tiny_orders import TinyOrdersPage, count_orders_in_period, fetch_orders_page
 
 
 def _page(*, page: int, total_pages: int, order_count: int, ids=None):
@@ -57,3 +57,34 @@ def test_count_rejects_inconsistent_last_page():
         c = count_orders_in_period("tok", data_inicial="01/08/2026", data_final="08/08/2026")
     assert not c.ok
     assert c.reason_code == "INCONSISTENT_PAGINATION"
+
+
+def test_fetch_empty_consulta_is_zero_ok():
+    empty = {
+        "retorno": {
+            "status_processamento": 2,
+            "status": "Erro",
+            "codigo_erro": 20,
+            "erros": [{"erro": "A Consulta não retornou registros"}],
+        }
+    }
+
+    class _Resp:
+        status = 200
+
+        def read(self):
+            import json
+
+            return json.dumps(empty).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    with patch("knowt.tiny_orders.urllib.request.urlopen", return_value=_Resp()):
+        page = fetch_orders_page("tok", page=1, situacao="preparado")
+    assert page.ok
+    assert page.order_count == 0
+    assert page.detail == "empty_consulta"
