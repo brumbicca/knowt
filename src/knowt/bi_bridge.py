@@ -16,6 +16,7 @@ from knowt.audit import append_answer_audit, audit_path_for
 from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import Period, today_br
 from knowt.sales_gates import can_publish_sales_summary, load_gates
+from knowt.discovery_dossier import load_latest_dossier, persist_discovery_dossier
 from knowt.discovery_ui import (
     load_latest_margin_reports,
     load_latest_product_cost_probe,
@@ -429,6 +430,20 @@ def create_bi_bridge_blueprint(
                 ),
             }
         )
+
+    @bp.get("/discovery/dossier")
+    def discovery_dossier():
+        """Inventário consolidado do que o Discovery já observou no Tiny."""
+        rebuild = (request.args.get("rebuild") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if rebuild:
+            dossier = persist_discovery_dossier(data_dir)
+        else:
+            dossier = load_latest_dossier(data_dir) or persist_discovery_dossier(data_dir)
+        return jsonify({"ok": True, "dossier": dossier})
 
     @bp.get("/fonte/status")
     def fonte_status():

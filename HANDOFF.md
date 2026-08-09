@@ -52,7 +52,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Tiny `orders.list` | **live** — contagem por período, situação, **resumo/breakdown** por situação |
 | Tiny `orders.detail` | **live** — situação, cliente, itens, ecommerce, valor Tiny (sem CMV) |
 | Tiny `sales.summary` | ainda `unavailable` — probe ok; gates parciais (falta `approved_to_publish` + `cost_field`≠defer) · `docs/SALES_SUMMARY_PACOTE.md` |
-| Discovery UI Playwright | `probe-system` + `probe-margin-reports` + `probe-cost` · catálogo Tiny tem **Preço de custo atual** e **Custo médio atual** (`#/view/27`, `#/view/17`) |
+| Discovery UI Playwright | dossiê consolidado `docs/TINY_DISCOVERY_DOSSIER.md` · `GET /api/bridge/discovery/dossier` · probes system/expand/margin/cost |
 | Tiny `margins.summary` | `unavailable` (slot criado; sem publish) |
 | Evidence sales | `/root/knowt-data/evidence/sales_probe_*.json` + `sales_summary_gates.json` |
 | Data path | `/root/knowt-data` |
