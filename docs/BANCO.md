@@ -24,6 +24,8 @@ Isto é **de propósito** na visão: o knowt não depende de copiar o Mongo do F
 /root/knowt-data/
   sources.json          # fontes + capabilities (live / unavailable)
   audit/answers.jsonl   # log das perguntas/respostas (sem secrets)
+  agenda.json           # compromissos locais (source knowt_local)
+  tasks.json            # tarefas locais (source knowt_local)
 ```
 
 Segredos (token Tiny, API Bearer, senha do chat) ficam em `/root/knowt/.env` (não no “banco”).

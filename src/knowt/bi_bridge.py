@@ -10,10 +10,17 @@ from typing import Any, Dict, Optional, Tuple
 
 from flask import Blueprint, jsonify, request
 
+from knowt.agenda_store import add_event, google_status as agenda_google_status, list_events
 from knowt.answers import answer_chat
 from knowt.audit import append_answer_audit, audit_path_for
 from knowt.period import Period, today_br
 from knowt.sources import SourceRegistry
+from knowt.tasks_store import (
+    add_task,
+    complete_task,
+    google_status as tasks_google_status,
+    list_tasks,
+)
 from knowt.tiny_orders import count_orders_in_period, fetch_orders_page
 from knowt.vault import resolve_secret
 
@@ -34,6 +41,8 @@ def _period_from_args() -> Period:
     p = (request.args.get("periodo") or "7d").strip().lower()
     if p in ("hoje",):
         return Period(hoje, hoje, "hoje")
+    if p in ("proximos", "próximos", "prox"):
+        return Period(hoje, hoje + timedelta(days=7), "próximos 7 dias")
     if p in ("semana",):
         start = hoje - timedelta(days=hoje.weekday())
         return Period(start, hoje, "esta semana")
@@ -298,18 +307,89 @@ def create_bi_bridge_blueprint(
 
     @bp.get("/agenda/periodo")
     def agenda_periodo():
+        period = _period_from_args()
+        events = list_events(data_dir, period.start, period.end)
+        gstat = agenda_google_status()
         return jsonify(
             {
                 "ok": True,
-                "eventos": [],
-                "events": [],
-                "note": "Agenda local ainda sem backend persistente no piloto.",
+                "periodo": _periodo_payload(period),
+                "events": events,
+                "eventos": events,
+                "count": len(events),
+                "google": gstat,
+                "source": "knowt_local",
             }
         )
 
+    @bp.post("/agenda/eventos")
+    def agenda_criar_evento():
+        payload = request.get_json(silent=True) or {}
+        try:
+            ev = add_event(
+                data_dir,
+                title=str(payload.get("title") or ""),
+                start_iso=str(payload.get("start") or ""),
+                end_iso=str(payload.get("end") or "") or None,
+                kind=str(payload.get("kind") or "reuniao"),
+            )
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"ok": False, "error": "bad_start", "detail": str(exc)[:120]}), 400
+        return jsonify({"ok": True, "event": ev})
+
+    @bp.get("/agenda/google/auth-url")
+    def agenda_google_auth_url():
+        return jsonify(
+            {
+                "ok": False,
+                "error": "google_not_configured",
+                "message": "Google Calendar ainda não está ligado no piloto knowt.",
+            }
+        ), 400
+
     @bp.get("/tarefas")
     def tarefas():
-        return jsonify({"ok": True, "tarefas": [], "tasks": []})
+        status = (request.args.get("status") or "open").strip().lower() or "open"
+        tasks = list_tasks(data_dir, status=status)
+        return jsonify(
+            {
+                "ok": True,
+                "tasks": tasks,
+                "tarefas": tasks,
+                "count": len(tasks),
+                "status_filter": status,
+                "google": tasks_google_status(),
+                "source": "knowt_local",
+            }
+        )
+
+    @bp.post("/tarefas")
+    def tarefas_criar():
+        payload = request.get_json(silent=True) or {}
+        try:
+            task = add_task(
+                data_dir,
+                title=str(payload.get("title") or ""),
+                priority=str(payload.get("priority") or "medium"),
+                due=str(payload.get("due") or "") or None,
+                notes=str(payload.get("notes") or "") or None,
+            )
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, "task": task})
+
+    @bp.post("/tarefas/concluir")
+    def tarefas_concluir():
+        payload = request.get_json(silent=True) or {}
+        tid = payload.get("id") or payload.get("task_id")
+        try:
+            task = complete_task(data_dir, str(tid or ""))
+        except ValueError as exc:
+            code = 404 if str(exc) == "not_found" else 400
+            return jsonify({"ok": False, "error": str(exc)}), code
+        return jsonify({"ok": True, "task": task})
 
     @bp.post("/assistant/chat")
     def assistant_chat():

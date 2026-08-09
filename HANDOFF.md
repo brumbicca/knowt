@@ -56,6 +56,7 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
 | Chat answer | `POST /v1/chat/answer` · períodos + situação · Bearer `KNOWT_API_TOKEN` |
 | Contagem período | 1ª+última página Tiny (`page_bounds`) — sem varrer todas as páginas |
+| Agenda / tarefas | JSON local `agenda.json` + `tasks.json` via `/api/bridge` (sem Google no MVP) |
 | Audit | `/root/knowt-data/audit/answers.jsonl` |
 | Nginx / TLS | rascunho `deploy/nginx-knowt.example.conf` — ver `docs/DNS.md` |
 
