@@ -49,8 +49,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Frontend | `knowt/frontend` · temas Fiesta no arranque · fonte Tiny |
 | Firewall Hostinger | grupo `knowt` · Accept 22/80/443 + Drop Any |
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
-| Tiny `orders.list` | **live** / `machine_validated` (2026-08-08) — página 1 = 100 pedidos · 3796 páginas |
-| Tiny `orders.detail` | **live** / `machine_validated` após publish (pedido.obter) |
+| Tiny `orders.list` | **live** — contagem por período, situação, **resumo/breakdown** por situação |
+| Tiny `orders.detail` | **live** — situação, cliente, itens, ecommerce, valor Tiny (sem CMV) |
 | Tiny `sales.summary` | ainda `unavailable` |
 | Data path | `/root/knowt-data` |
 | API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
@@ -82,7 +82,7 @@ Até lá a API fica só em loopback + Bearer `KNOWT_API_TOKEN`.
 1. ~~Visão + scaffold repo~~  
 2. ~~Provisionar VPS~~ · ~~bootstrap `/root/knowt`~~ · DNS knowt ainda TBD  
 3. ~~MVP 0 código~~ (vault, sources, discovery stub, enforcement, health) — ver `docs/MVP0.md`  
-4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~ · ~~contagem page_bounds~~ · ~~orders.detail + catálogo no chat~~  
+4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~ · ~~contagem page_bounds~~ · ~~orders.detail + catálogo no chat~~ · ~~resumo por situação + amostra/ecommerce~~  
 5. Extrair/adaptar discovery real Tiny (mais endpoints)  
 6. ~~DNS knowt + Nginx/TLS (+ firewall 80/443)~~  
 7. ~~Chat web piloto em knowt.com.br~~ · Hermes Telegram/WhatsApp ainda TBD  

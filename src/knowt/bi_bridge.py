@@ -250,7 +250,7 @@ def create_bi_bridge_blueprint(
                 "recomendacoes": [
                     {
                         "titulo": "Perguntar no chat",
-                        "detalhe": "Ex.: «pedidos esta semana» ou «pedido <id>»",
+                        "detalhe": "Ex.: «resumo de pedidos esta semana» ou «pedido <id>»",
                         "tipo": "acao",
                     }
                 ],

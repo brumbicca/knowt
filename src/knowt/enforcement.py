@@ -25,6 +25,9 @@ _INTENT_RULES: List[Tuple[str, Tuple[str, ...]]] = [
         (
             r"\bpedidos?\b",
             r"\borders?\b",
+            r"\bpor\s+situa",
+            r"\bdistribui",
+            r"\bbreakdown\b",
         ),
     ),
 ]
@@ -86,6 +89,10 @@ def format_source_catalog(registry: SourceRegistry, source_id: str) -> str:
     lines.append(
         "Posso responder como fato só o que está **live** + "
         "`machine_validated`. Vendas/margem ficam bloqueadas até validação."
+    )
+    lines.append(
+        "Exemplos: «pedidos esta semana», «pedidos cancelados últimos 7 dias», "
+        "«resumo de pedidos esta semana», «pedido 752095868»."
     )
     return "\n".join(lines)
 

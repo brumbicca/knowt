@@ -12,6 +12,19 @@ TINY_V2_ORDERS_URL = "https://api.tiny.com.br/api2/pedidos.pesquisa.php"
 
 
 @dataclass
+class TinyOrderPreview:
+    """Campos opcionais que a listagem Tiny pode trazer (sem inventar)."""
+
+    id: str
+    numero: Optional[str] = None
+    situacao: Optional[str] = None
+    data_pedido: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class TinyOrdersPage:
     ok: bool
     reason_code: str
@@ -21,6 +34,7 @@ class TinyOrdersPage:
     total_pages: Optional[int] = None
     order_count: int = 0
     order_ids: List[str] = field(default_factory=list)
+    order_previews: List[Dict[str, Any]] = field(default_factory=list)
     detail: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -128,13 +142,30 @@ def fetch_orders_page(
         )
 
     ids: List[str] = []
+    previews: List[Dict[str, Any]] = []
     for row in pedidos:
         if not isinstance(row, dict):
             continue
         ped = row.get("pedido") if isinstance(row.get("pedido"), dict) else row
+        if not isinstance(ped, dict):
+            continue
         oid = ped.get("id") or ped.get("id_pedido") or ped.get("numero")
-        if oid is not None:
-            ids.append(str(oid))
+        if oid is None:
+            continue
+        oid_s = str(oid)
+        ids.append(oid_s)
+        if len(previews) < 8:
+            numero = ped.get("numero")
+            situacao = ped.get("situacao") or ped.get("descricao_situacao")
+            data_p = ped.get("data_pedido") or ped.get("data")
+            previews.append(
+                TinyOrderPreview(
+                    id=oid_s,
+                    numero=str(numero) if numero is not None else None,
+                    situacao=str(situacao) if situacao else None,
+                    data_pedido=str(data_p) if data_p else None,
+                ).to_dict()
+            )
 
     pagina = ret.get("pagina")
     num_paginas = ret.get("numero_paginas")
@@ -156,6 +187,7 @@ def fetch_orders_page(
         total_pages=total_i,
         order_count=len(ids),
         order_ids=ids[:50],
+        order_previews=previews,
         detail="page_ok",
     )
 

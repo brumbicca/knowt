@@ -1,12 +1,16 @@
 """Respostas determinísticas pós-enforcement (sem LLM no MVP)."""
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from knowt.enforcement import EnforcementResult, enforce
 from knowt.order_id import extract_order_id
 from knowt.period import parse_period
-from knowt.situacao import parse_situacao
+from knowt.situacao import (
+    BREAKDOWN_SITUACOES,
+    parse_situacao,
+    wants_situacao_breakdown,
+)
 from knowt.sources import SourceRegistry
 from knowt.tiny_order_detail import fetch_order_detail
 from knowt.tiny_orders import count_orders_in_period, fetch_orders_page
@@ -17,6 +21,46 @@ def _token_for(registry: SourceRegistry, source_id: str) -> str:
     src = registry.get(source_id)
     ref = (src.secret_refs or {}).get("api_token") if src else None
     return resolve_secret(ref or "KNOWT_SECRET_TINY_TOKEN", required=True)
+
+
+def _format_previews(previews: List[Dict[str, Any]], *, limit: int = 5) -> str:
+    parts: List[str] = []
+    for row in (previews or [])[:limit]:
+        oid = row.get("id") or "?"
+        bits = [f"`{oid}`"]
+        if row.get("numero"):
+            bits.append(f"nº {row['numero']}")
+        if row.get("situacao"):
+            bits.append(str(row["situacao"]))
+        if row.get("data_pedido"):
+            bits.append(str(row["data_pedido"]))
+        parts.append(" · ".join(bits))
+    return "; ".join(parts) if parts else "(nenhum nesta página)"
+
+
+def _breakdown_por_situacao(
+    token: str,
+    *,
+    data_inicial: str,
+    data_final: str,
+) -> Dict[str, Any]:
+    rows: List[Dict[str, Any]] = []
+    for label, api_val in BREAKDOWN_SITUACOES:
+        counted = count_orders_in_period(
+            token,
+            data_inicial=data_inicial,
+            data_final=data_final,
+            situacao=api_val,
+        )
+        rows.append(
+            {
+                "situacao": label,
+                "ok": counted.ok,
+                "total_orders": counted.total_orders if counted.ok else None,
+                "reason_code": counted.reason_code,
+            }
+        )
+    return {"by_situacao": rows}
 
 
 def answer_chat(
@@ -59,13 +103,19 @@ def answer_chat(
             if detail.valor_total is not None
             else ""
         )
+        ecom = (
+            f" ecommerce **{detail.ecommerce_numero}**,"
+            if detail.ecommerce_numero
+            else ""
+        )
         out["answer"] = (
             f"Fonte `{source_id}` · `orders.detail` ({enf.mode}). "
             f"Pedido id `{detail.order_id}`"
             + (f" nº {detail.numero}" if detail.numero else "")
             + f": situação **{detail.situacao or '—'}**, "
             f"data {detail.data_pedido or '—'}, "
-            f"cliente {detail.cliente_nome or '—'}, "
+            f"cliente {detail.cliente_nome or '—'},"
+            f"{ecom} "
             f"{detail.itens_count} item(ns) (skus: {skus})."
             f"{valor} "
             "Valor é o da Tiny; sem CMV/margem recalculada pelo knowt."
@@ -79,6 +129,7 @@ def answer_chat(
         sit_label: Optional[str] = sit[0] if sit else None
         sit_api: Optional[str] = sit[1] if sit else None
         sit_txt = f" · situação **{sit_label}**" if sit_label else ""
+        want_break = wants_situacao_breakdown(message) and not sit_api
 
         if period:
             d0, d1 = period.tiny_bounds()
@@ -104,12 +155,43 @@ def answer_chat(
                 if counted.method == "page_bounds"
                 else "página única"
             )
+            sample = (
+                ", ".join(f"`{x}`" for x in counted.sample_ids[:5])
+                if counted.sample_ids
+                else ""
+            )
+            sample_txt = f" Amostra de ids: {sample}." if sample else ""
+
+            if want_break:
+                br = _breakdown_por_situacao(token, data_inicial=d0, data_final=d1)
+                out["data"]["breakdown"] = br
+                bits: List[str] = []
+                for row in br["by_situacao"]:
+                    if row["ok"] and row["total_orders"] is not None:
+                        if row["total_orders"] > 0:
+                            bits.append(f"**{row['situacao']}** {row['total_orders']}")
+                    else:
+                        bits.append(f"{row['situacao']} (falhou: {row['reason_code']})")
+                br_txt = "; ".join(bits) if bits else "(sem pedidos nas situações amostradas)"
+                out["answer"] = (
+                    f"Fonte `{source_id}` · `orders.list` ({enf.mode}) · período "
+                    f"**{period.label}** ({d0} a {d1}): "
+                    f"**{counted.total_orders}** pedido(s) no total "
+                    f"({how}; {counted.total_pages} página(s)). "
+                    f"Por situação: {br_txt}. "
+                    "Contagens por filtro Tiny (não inventamos receita/margem). "
+                    "Detalhe: «pedido <id>»."
+                )
+                return out
+
             out["answer"] = (
                 f"Fonte `{source_id}` · `orders.list` ({enf.mode}) · período "
                 f"**{period.label}** ({d0} a {d1}){sit_txt}: "
                 f"**{counted.total_orders}** pedido(s) "
-                f"({how}; {counted.total_pages} página(s) no intervalo). "
-                "Sem valor/margem. Para um pedido: «pedido 752095868»."
+                f"({how}; {counted.total_pages} página(s) no intervalo)."
+                f"{sample_txt} "
+                "Sem valor/margem. Experimente «resumo de pedidos esta semana» "
+                "ou «pedido 752095868»."
             )
             return out
 
@@ -121,18 +203,18 @@ def answer_chat(
                 "Não invento números."
             )
             return out
-        ids_preview = (
-            ", ".join(page.order_ids[:5]) if page.order_ids else "(nenhum nesta página)"
-        )
+        preview_txt = _format_previews(page.order_previews)
+        if preview_txt == "(nenhum nesta página)" and page.order_ids:
+            preview_txt = ", ".join(page.order_ids[:5])
         out["answer"] = (
             f"Fonte `{source_id}` · capability `orders.list` ({enf.mode})"
             f"{sit_txt}. "
             f"Página {page.page} de {page.total_pages}: "
             f"{page.order_count} pedido(s) nesta página. "
-            f"Ids (amostra): {ids_preview}. "
+            f"Amostra: {preview_txt}. "
             "Sem valor/margem — só o que a API de listagem confirmou. "
-            "Pode perguntar por período (ex.: pedidos cancelados esta semana) "
-            "ou «pedido 752095868»."
+            "Pode perguntar por período (ex.: pedidos cancelados esta semana), "
+            "«resumo de pedidos esta semana» ou «pedido 752095868»."
         )
         return out
 
