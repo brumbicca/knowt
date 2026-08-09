@@ -149,9 +149,15 @@ function buildSuggestions(pathname: string, periodPhrase: string): Suggestion[] 
       { short: 'Sync', ask: 'A sync está a correr? Qual o estado?' },
       { short: 'Sem NF', ask: 'Alertas de pedidos sem NF' },
     ],
+    '/insights': [
+      { short: 'Pedidos', ask: `Quantos pedidos ${p}?` },
+      { short: 'Discovery', ask: 'O que já conhecemos do Tiny?' },
+      { short: 'Resumo', ask: `Resumo de pedidos ${p}` },
+    ],
     '/vendas': [
       { short: 'Vendas', ask: `Quanto vendemos ${p}?` },
       { short: 'Por canal', ask: `Vendas ${p} por canal` },
+      { short: 'Discovery', ask: 'O que já conhecemos do Tiny?' },
     ],
   }
   const domain = Object.keys(byPath).find((k) => pathname === k || pathname.startsWith(`${k}/`))
@@ -159,7 +165,7 @@ function buildSuggestions(pathname: string, periodPhrase: string): Suggestion[] 
     ? byPath[domain]
     : [
     { short: 'Vendas', ask: `Quanto vendemos ${p}?` },
-    { short: 'Shopee', ask: `Quanto vendemos ${p} na Shopee?` },
+    { short: 'Discovery', ask: 'O que já conhecemos do Tiny?' },
     { short: 'Áudio → tarefa', ask: 'Cria uma tarefa: revisar cobertura fiscal' },
     { short: 'Áudio → agenda', ask: 'Agenda call amanhã às quinze horas' },
   ]

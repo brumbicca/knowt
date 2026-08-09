@@ -61,6 +61,27 @@ def wants_catalog(text: str) -> bool:
     return any(re.search(p, msg, flags=re.I) for p in _CATALOG_PATTERNS)
 
 
+_DISCOVERY_DOSSIER_PATTERNS = (
+    r"\bdiscovery\b",
+    r"\bdossi[eê]\b",
+    r"\binvent[aá]rio\b",
+    r"\bo\s+que\s+j[aá]\s+conhec",
+    r"\bo\s+que\s+conhecemos\b",
+    r"\bconhecemos\s+do\s+tiny\b",
+    r"\bmapa\s+do\s+(?:sistema|erp|tiny)\b",
+    r"\bplaywright\b",
+)
+
+
+def wants_discovery_dossier(text: str) -> bool:
+    msg = (text or "").strip().lower()
+    if not msg:
+        return False
+    if wants_catalog(msg):
+        return False
+    return any(re.search(p, msg, flags=re.I) for p in _DISCOVERY_DOSSIER_PATTERNS)
+
+
 def classify_intent(text: str) -> Optional[str]:
     msg = (text or "").strip().lower()
     if not msg:
@@ -93,7 +114,8 @@ def format_source_catalog(registry: SourceRegistry, source_id: str) -> str:
     lines.append(
         "Exemplos: «pedidos esta semana», «pedidos cancelados últimos 7 dias», "
         "«resumo de pedidos esta semana», «pedido 752095868», "
-        "«cria uma tarefa Revisar Tiny», «agenda call amanhã às 15h»."
+        "«o que já conhecemos do Tiny?», «cria uma tarefa Revisar Tiny», "
+        "«agenda call amanhã às 15h»."
     )
     return "\n".join(lines)
 

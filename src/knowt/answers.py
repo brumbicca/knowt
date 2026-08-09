@@ -5,7 +5,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from knowt.chat_actions import try_chat_action
-from knowt.enforcement import EnforcementResult, enforce
+from knowt.discovery_dossier import (
+    load_latest_dossier,
+    persist_discovery_dossier,
+    render_dossier_chat,
+)
+from knowt.enforcement import EnforcementResult, enforce, wants_discovery_dossier
 from knowt.order_id import extract_order_id
 from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import parse_period
@@ -48,6 +53,26 @@ def answer_chat(
         action = try_chat_action(Path(data_dir), message)
         if action is not None:
             return action
+
+    if data_dir is not None and wants_discovery_dossier(message):
+        root = Path(data_dir)
+        dossier = load_latest_dossier(root) or persist_discovery_dossier(root)
+        return {
+            "enforcement": {
+                "allow_llm": False,
+                "mode": "fact",
+                "message": "discovery observation",
+                "capability_id": "discovery.dossier",
+                "reason_code": "DISCOVERY_OBSERVATION",
+                "source_id": source_id,
+            },
+            "answer": render_dossier_chat(dossier),
+            "data": {
+                "summary": dossier.get("summary"),
+                "blocked_for_publish": dossier.get("blocked_for_publish"),
+                "path": dossier.get("path"),
+            },
+        }
 
     enf: EnforcementResult = enforce(registry, message=message, source_id=source_id)
     out: Dict[str, Any] = {"enforcement": enf.to_dict(), "answer": None, "data": None}

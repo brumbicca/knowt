@@ -224,6 +224,52 @@ def render_dossier_markdown(dossier: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_dossier_chat(dossier: Dict[str, Any]) -> str:
+    """Resumo curto para o assistente (sem dump enorme)."""
+    s = dossier.get("summary") or {}
+    lines = [
+        "Dossiê Discovery Tiny (observação Playwright — **não** é KPI de vendas/margem live):",
+        f"- Mapa base: **{s.get('system_map_pages') or 0}** páginas",
+        f"- Expand menus: **{s.get('expand_discovered') or 0}** links · "
+        f"**{s.get('expand_pages_ok') or 0}/{s.get('expand_pages_total') or 0}** visitadas",
+        f"- Relatórios oficiais de margem abertos: **{s.get('margin_reports_ok') or 0}**",
+        f"- Amostra aba Custos: **{'ok' if s.get('product_cost_ok') else 'sem evidência'}**",
+        f"- Probe vendas (7d): **{s.get('sales_probe_orders') if s.get('sales_probe_orders') is not None else 'n/d'}** pedidos",
+        f"- Gate `cost_field`: **`{s.get('cost_field_gate') or 'n/d'}`** · "
+        f"publish: **{bool(s.get('approved_to_publish'))}**",
+    ]
+    # destaque custo oficial
+    for r in ((dossier.get("margin_official_reports") or {}).get("reports") or []):
+        costish = r.get("cost_fields_in_catalog") or []
+        if costish:
+            lines.append(
+                f"- Catálogo «{r.get('label')}»: **{', '.join(costish)}**"
+            )
+            break
+    pc = dossier.get("product_cost_sample") or {}
+    fields = pc.get("fields") or []
+    if fields:
+        bits = [
+            f"{f.get('ui_label')}={f.get('raw_value')}"
+            for f in fields
+            if f.get("raw_value") is not None
+        ]
+        if bits:
+            prod = ((pc.get("product") or {}).get("name") or "produto amostra")[:60]
+            lines.append(f"- Amostra «{prod}»: " + " · ".join(bits))
+    blocked = dossier.get("blocked_for_publish") or []
+    if blocked:
+        lines.append("Bloqueios publish: " + "; ".join(blocked))
+    lines.append(
+        "Pergunta em aberto: CMV do piloto usa **preço de custo** ou **custo médio**?"
+    )
+    lines.append(
+        "Exemplos: «pedidos esta semana», «resumo de pedidos», "
+        "«o que podes fazer?» (catálogo de capabilities)."
+    )
+    return "\n".join(lines)
+
+
 def load_latest_dossier(data_dir: Path) -> Optional[Dict[str, Any]]:
     path = evidence_dir(data_dir) / "discovery_dossier_latest.json"
     if not path.is_file():
