@@ -13,6 +13,56 @@ Bridge: `GET /api/bridge/sales/probe/latest` e `/insights/plano` (Bearer).
 `matches_official_report=unknown`. **`approved_to_publish=false`** (falta isso + `approver`
 após reconciliação com relatório oficial).
 
+## Como exportar no Tiny (mesmo período do probe)
+
+**Alvo do probe** (não reabrir data à sorte — usar estas):
+
+| Item | Valor |
+|---|---|
+| Período | **03/08/2026 → 09/08/2026** (datas Tiny `dataInicial`/`dataFinal`) |
+| Contagem API | **3375** pedidos (`page_bounds`, 34 páginas) |
+| Receita período | **não** fechar ainda — API só somou página 1 = **R$ 4.905,63** (100 pedidos) |
+| Amostra p/ bater valor | ids `758016016` (30,64), `758016114` (7,74), `758016270` (35,18) |
+
+### Passo a passo (UI Tiny ERP)
+
+1. Entrar em [erp.tiny.com.br](https://erp.tiny.com.br) na **mesma conta** do token knowt.
+2. Ir a **Vendas → Pedidos de venda** (lista de pedidos; não “orçamentos”).
+3. Filtros:
+   - **Data inicial** = `03/08/2026`
+   - **Data final** = `09/08/2026`
+   - Usar o filtro de **data do pedido** (o que a Tiny usa na pesquisa — o mesmo critério da API `pedidos.pesquisa`).
+   - **Situação** = todas / sem filtro (o probe não filtrou situação).
+   - **Ecommerce / vendedor / depósito** = sem filtro extra.
+4. Anotar o **total de pedidos** que a lista/paginação mostra (canto da listagem ou última página × tamanho).
+5. Abrir **3 pedidos da amostra** acima e copiar: nº, data, situação, valor total.
+6. (Opcional) Em **Relatórios → Vendas** (ou equivalente “pedidos por período”), gerar o mesmo intervalo e anotar **qtd + faturamento total** se o relatório existir — marcar se o relatório exclui cancelados.
+
+### O que me enviar no chat (cola assim)
+
+```
+período: 03/08/2026–09/08/2026
+total_pedidos_ui: <n>
+filtros: data do pedido, sem situação
+faturamento_relatorio: <R$ ou n/d>
+amostra:
+  758016016 → valor UI: … situação: …
+  758016114 → valor UI: … situação: …
+  758016270 → valor UI: … situação: …
+diferença_contagem: <ui − 3375>
+notas: …
+```
+
+### Critério para `matches_official_report`
+
+| Resultado | Gate |
+|---|---|
+| Contagem UI ≈ 3375 (± poucos / mesma regra de data) e amostra de valor bate | `yes` |
+| Contagem ou amostra diverge e não há explicação (cancelados, outro filtro de data) | `no` |
+| Ainda sem export / dúvida de filtro | `unknown` (como agora) |
+
+**Não** marcar `approved_to_publish=true` só porque a contagem bate — falta ainda `cost_field` ≠ `defer` (ou decisão explícita) + dono.
+
 ## O que o knowt faz agora
 
 1. **Probe técnico** (`python scripts/run_sales_probe.py`)  
