@@ -956,94 +956,133 @@ def probe_margin_reports(
                         entry["error"] = "report_link_not_found"
                         reports.append(entry)
                         continue
-                    page.wait_for_timeout(4000)
-                    # SPA de relatórios personalizados: esperar botão / texto de filtros
-                    for wait_sel in (
-                        "text=/configurando os filtros/i",
-                        "text=/gerar relatório/i",
-                        "button:has-text('gerar')",
-                        "text=/filtro/i",
-                    ):
-                        try:
-                            page.locator(wait_sel).first.wait_for(timeout=4000)
-                            break
-                        except Exception:
-                            continue
-                    page.wait_for_timeout(1500)
+                    page.wait_for_timeout(2500)
                     entry["url"] = page.url
                     entry["page_title"] = (page.title() or "").strip()
                     entry["headings"] = _collect_headings(page)
                     entry["table_headers"] = _collect_table_headers(page)
-                    entry["filter_labels"] = _collect_filter_labels(page)
-                    # Extracção extra da SPA (placeholders + textos próximos a inputs)
-                    # Abrir painel «Filtros e busca» se existir
-                    for filt_sel in (
-                        "text=/^Filtros e busca$/i",
-                        "button:has-text('Filtros')",
-                        "text=/Filtros e busca/i",
+                    entry["columns"] = []
+                    entry["available_columns_sample"] = []
+                    entry["customized"] = False
+
+                    for pers_sel in (
+                        "text=/personalizar relatório/i",
+                        "button:has-text('personalizar')",
                     ):
                         try:
-                            fl = page.locator(filt_sel).first
-                            if fl.count():
-                                fl.click(timeout=3000)
-                                page.wait_for_timeout(1200)
-                                break
+                            ploc = page.locator(pers_sel).first
+                            if ploc.count() == 0:
+                                continue
+                            ploc.click(timeout=4000)
+                            page.wait_for_timeout(2200)
+                            entry["customized"] = True
+                            schema = page.evaluate(
+                                """() => {
+                                  const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+                                  const skip = new Set([
+                                    'notificações','ro','configurações','voltar',
+                                    'dicas para criar relatórios','adicionar colunas',
+                                    'salvar relatório','cancelar','erp'
+                                  ]);
+                                  const cols = [];
+                                  for (const el of Array.from(document.querySelectorAll('label, button, li, span'))) {
+                                    const t = norm(el.innerText);
+                                    if (!t || t.length < 2 || t.length > 90) continue;
+                                    if (skip.has(t.toLowerCase())) continue;
+                                    if (/^(salvar|cancelar|adicionar|dicas|notifica)/i.test(t)) continue;
+                                    cols.push(t);
+                                  }
+                                  const seen = new Set();
+                                  const out = [];
+                                  for (const c of cols) {
+                                    const k = c.toLowerCase();
+                                    if (seen.has(k)) continue;
+                                    seen.add(k);
+                                    out.push(c);
+                                  }
+                                  const body = norm(document.body.innerText).slice(0, 1800);
+                                  return { columns: out.slice(0, 80), body };
+                                }"""
+                            )
+                            raw_cols = list(schema.get("columns") or [])
+                            noise = {
+                                "início",
+                                "cadastros",
+                                "suprimentos",
+                                "vendas",
+                                "finanças",
+                                "fixar menu",
+                                "ferramentas",
+                                "relatórios personalizados",
+                                "canal de ideias",
+                                "indique e ganhe",
+                            }
+                            entry["columns"] = [
+                                c
+                                for c in raw_cols
+                                if c.strip().lower() not in noise
+                            ]
+                            entry["body_preview"] = re.sub(
+                                r"\s+", " ", schema.get("body") or ""
+                            ).strip()[:500]
+                            try:
+                                add = page.locator("text=/adicionar colunas/i").first
+                                if add.count():
+                                    add.click(timeout=3000)
+                                    page.wait_for_timeout(1500)
+                                    avail = page.evaluate(
+                                        """() => {
+                                          const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+                                          const texts = Array.from(document.querySelectorAll('label, li, button, span, td'))
+                                            .map(el => norm(el.innerText))
+                                            .filter(t => t && t.length > 2 && t.length < 80);
+                                          const uniq = [];
+                                          const seen = new Set();
+                                          for (const t of texts) {
+                                            const k = t.toLowerCase();
+                                            if (seen.has(k)) continue;
+                                            seen.add(k);
+                                            uniq.push(t);
+                                          }
+                                          const costish = uniq.filter(t =>
+                                            /custo|margem|cmv|lucro|contribu/i.test(t)
+                                          );
+                                          return { all: uniq.slice(0, 120), costish: costish.slice(0, 50) };
+                                        }"""
+                                    )
+                                    entry["available_columns_sample"] = list(
+                                        avail.get("costish") or []
+                                    ) or list(avail.get("all") or [])[:30]
+                                    entry["available_columns_total_sample"] = len(
+                                        avail.get("all") or []
+                                    )
+                            except Exception:
+                                pass
+                            break
                         except Exception:
                             continue
-                    try:
-                        spa = page.evaluate(
-                            """() => {
-                              const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
-                              const labels = [];
-                              for (const el of Array.from(document.querySelectorAll('label, .label, [class*=Label], [class*=filtro] span, [class*=filter] span'))) {
-                                const t = norm(el.innerText);
-                                if (t && t.length > 1 && t.length < 80) labels.push(t);
-                              }
-                              const placeholders = [];
-                              for (const el of Array.from(document.querySelectorAll('input, select, textarea'))) {
-                                const ph = norm(el.getAttribute('placeholder'));
-                                const name = norm(el.getAttribute('name') || el.getAttribute('aria-label'));
-                                const aria = norm(el.getAttribute('aria-labelledby'));
-                                if (ph) placeholders.push(ph);
-                                if (name) placeholders.push(name);
-                              }
-                              // textos em drawers/side panels
-                              const panels = Array.from(document.querySelectorAll('[class*=drawer], [class*=Drawer], [class*=sidebar], [class*=panel], [role=dialog], aside'));
-                              const panelText = panels.map(el => norm(el.innerText)).filter(Boolean).join(' | ').slice(0, 1500);
-                              const buttons = Array.from(document.querySelectorAll('button, a.btn, [role=button]'))
-                                .map(el => norm(el.innerText)).filter(Boolean).slice(0, 40);
-                              const body = norm(document.body.innerText).slice(0, 1500);
-                              return { labels: labels.slice(0, 60), placeholders: placeholders.slice(0, 40), buttons, panelText, body };
-                            }"""
-                        )
-                        entry["spa"] = {
-                            "labels": _clean_texts(list(spa.get("labels") or []), limit=40),
-                            "placeholders": _clean_texts(
-                                list(spa.get("placeholders") or []), limit=30
-                            ),
-                            "buttons": _clean_texts(list(spa.get("buttons") or []), limit=25),
-                            "panel_preview": (spa.get("panelText") or "")[:400] or None,
-                        }
-                        if spa.get("body"):
-                            entry["body_preview"] = re.sub(
-                                r"\s+", " ", spa["body"]
-                            ).strip()[:500]
-                        merged = list(entry.get("filter_labels") or [])
-                        merged.extend(entry["spa"].get("labels") or [])
-                        merged.extend(entry["spa"].get("placeholders") or [])
-                        # tokens úteis do painel
-                        if spa.get("panelText"):
-                            for tok in re.split(r"[|\n]", spa["panelText"]):
-                                tok = tok.strip()
-                                if 2 < len(tok) < 60:
-                                    merged.append(tok)
-                        entry["filter_labels"] = _clean_texts(merged, limit=50)
-                    except Exception:
+
+                    if not entry.get("body_preview"):
                         try:
-                            b = page.inner_text("body")[:900]
-                            entry["body_preview"] = re.sub(r"\s+", " ", b).strip()[:400]
+                            entry["body_preview"] = re.sub(
+                                r"\s+", " ", page.inner_text("body")[:700]
+                            ).strip()[:400]
                         except Exception:
                             entry["body_preview"] = None
+
+                    blob = " ".join(entry.get("columns") or []).lower()
+                    entry["hints"] = {
+                        "has_revenue_fields": any(
+                            x in blob
+                            for x in ("total produtos", "valor total", "venda")
+                        ),
+                        "has_freight_fields": "frete" in blob,
+                        "has_commission_fields": "comiss" in blob,
+                        "has_cost_or_margin_in_selected": bool(
+                            re.search(r"custo|margem|cmv", blob)
+                        ),
+                        "costish_in_catalog": entry.get("available_columns_sample") or [],
+                    }
                     entry["ok"] = not _looks_like_login(
                         entry["url"] or "",
                         entry["page_title"] or "",
@@ -1063,8 +1102,8 @@ def probe_margin_reports(
             out["findings"] = [
                 "Relatórios personalizados: Avaliação de margem → #/view/27",
                 "Relatórios personalizados: Margem de Contribuição → #/view/17",
-                "UI exige configurar filtros antes de gerar (sem tabela até então)",
-                "Ações observadas: personalizar relatório, gerar relatório, Filtros e busca",
+                "Schema via «personalizar relatório» (colunas seleccionadas + catálogo)",
+                "UI exige filtros antes de gerar resultado tabular",
                 "Não extrair CMV daqui sem cost_field + período alinhado ao probe",
             ]
             if not out["ok"]:
