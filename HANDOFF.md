@@ -45,8 +45,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | SSH key | `%USERPROFILE%\.ssh\id_ed25519_knowt` (comentário `knowt-vps`) |
 | API / chat URL | https://knowt.com.br (TLS 2026-08-08) |
 | Mongo | instância própria na VPS knowt (_ainda não_) |
-| Hermes home | chat web em https://knowt.com.br (piloto); Hermes Telegram depois |
-| Chat web | login com `KNOWT_CHAT_PASSWORD` · ver `docs/BANCO.md` para dados |
+| Hermes home | SPA Insights+Chat (cópia fiesta-bi) em https://knowt.com.br · assistente via `/api/bridge` |
+| Frontend | `knowt/frontend` · temas Fiesta no arranque · fonte Tiny |
 | Firewall Hostinger | grupo `knowt` · Accept 22/80/443 + Drop Any |
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
 | Tiny `orders.list` | **live** / `machine_validated` (2026-08-08) — página 1 = 100 pedidos · 3796 páginas |

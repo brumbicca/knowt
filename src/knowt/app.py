@@ -8,6 +8,7 @@ from knowt import __version__
 from knowt.answers import answer_chat
 from knowt.audit import append_answer_audit, audit_path_for
 from knowt.auth import extract_bearer
+from knowt.bi_bridge import create_bi_bridge_blueprint
 from knowt.config import Settings
 from knowt.discovery import run_discovery_stub
 from knowt.enforcement import enforce
@@ -49,6 +50,13 @@ def create_app(settings: Settings | None = None) -> Flask:
     app.secret_key = settings.secret_key
     app.config["KNOWT_SETTINGS"] = settings
     app.config["KNOWT_REGISTRY"] = registry
+    app.register_blueprint(
+        create_bi_bridge_blueprint(
+            registry,
+            data_dir=settings.data_dir,
+            api_token=settings.api_token,
+        )
+    )
 
     @app.before_request
     def _auth_v1():
