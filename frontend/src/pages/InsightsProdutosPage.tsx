@@ -484,12 +484,12 @@ export function InsightsProdutosPage() {
         {
           title: semCusto > 0 ? `Completar CMV de ${Math.min(semCusto, 20)} SKUs vendidos` : 'Auditar CMV do catálogo',
           detail: 'Sem custo, a saúde de margem e o ABC ficam incompletos.',
-          to: '/margens',
+          to: '/insights/financeiro',
         },
         {
           title: 'Explorar faixas de ticket',
           detail: 'Ajustar mix/preço onde a concentração de ticket estiver enviesada.',
-          to: '/vendas',
+          to: '/insights/comercial',
         },
       ] as const,
     [semCusto],

@@ -366,7 +366,7 @@ export function InsightsFinanceiroPage() {
         title: `Despesas em ${despPct}% da receita`,
         detail: topDespesaCat
           ? `Atenção à categoria ${topDespesaCat.full} — revisar corte ou renegociação.`
-          : 'Revisar categorias de despesa no Business.',
+          : 'Revisar categorias de despesa nos Insights.',
       }
     }
     if (resultado < 0) {
@@ -393,7 +393,7 @@ export function InsightsFinanceiroPage() {
         },
         {
           title: 'Acelerar liquidação',
-          detail: 'Cruzar pagamentos e status de pedidos no Business.',
+          detail: 'Cruzar pagamentos e status de pedidos nos Insights.',
           to: '/pagamentos',
         },
         {
@@ -402,7 +402,7 @@ export function InsightsFinanceiroPage() {
             data?.coberturaPct != null && data.coberturaPct < 90
               ? `Cobertura ${data.coberturaPct}% — completar NF/CMV.`
               : 'Auditar CMV e impostos dos pedidos.',
-          to: '/margens',
+          to: '/insights/financeiro',
         },
         {
           title: 'Projetar fluxo 30 dias',

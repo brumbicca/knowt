@@ -348,27 +348,27 @@ export function InsightsComercialPage() {
       recs.push({
         title: `Priorizar ${Math.min(pend.total, 12)} pedidos no funil`,
         detail: 'Focar nos de maior valor ainda não concluídos.',
-        to: '/pedidos',
+        to: '/insights/comercial',
       })
     }
     if (highValue > 0) {
       recs.push({
         title: 'Revisar abordagem nos pedidos críticos',
         detail: 'Acompanhar status e NF dos top valores da amostra.',
-        to: '/fiscal',
+        to: '/insights/financeiro',
       })
     }
     if (clientesTotal > 0) {
       recs.push({
         title: `Explorar base de ${clientesTotal} clientes`,
-        detail: 'Cruzar UF/tipo com campanhas de reativação no Business.',
+        detail: 'Cruzar UF/tipo com campanhas de reativação nos Insights.',
         to: '/clientes',
       })
     } else {
       recs.push({
         title: 'Acompanhar desempenho por canal',
-        detail: 'Abrir Vendas no Business para drill-down completo.',
-        to: '/vendas',
+        detail: 'Abrir Comercial nos Insights para drill-down.',
+        to: '/insights/comercial',
       })
     }
     return recs.slice(0, 3)
@@ -416,7 +416,7 @@ export function InsightsComercialPage() {
           </Button>
           <Link
             component={RouterLink}
-            to="/vendas"
+            to="/insights/comercial"
             underline="hover"
             fontWeight={600}
             sx={{ fontSize: '0.85rem' }}
@@ -505,7 +505,7 @@ export function InsightsComercialPage() {
                 Receita no período
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Série diária · mesma fonte do Business
+                Série diária · mesma fonte do knowt
               </Typography>
               <Box sx={{ width: '100%', height: 280 }}>
                 {receitaSerie.length > 1 ? (
@@ -722,7 +722,7 @@ export function InsightsComercialPage() {
               <Box sx={{ textAlign: 'center', mt: 1.5 }}>
                 <Link
                   component={RouterLink}
-                  to="/vendas"
+                  to="/insights/comercial"
                   underline="hover"
                   fontWeight={600}
                   sx={{ fontSize: '0.85rem' }}
@@ -808,7 +808,7 @@ export function InsightsComercialPage() {
               <Box sx={{ textAlign: 'center', mt: 1.5 }}>
                 <Link
                   component={RouterLink}
-                  to="/pedidos"
+                  to="/insights/comercial"
                   underline="hover"
                   fontWeight={600}
                   sx={{ fontSize: '0.85rem' }}

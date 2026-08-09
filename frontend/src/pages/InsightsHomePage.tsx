@@ -137,7 +137,7 @@ function InsightHeroCard({ title, value, hint, icon, tone, to, cta }: InsightCar
   )
 }
 
-/** Insights · pág.12 — resumo executivo (dados Business + agenda compacta). */
+/** Insights · pág.12 — resumo executivo (KPIs + agenda compacta). */
 export function InsightsHomePage() {
   const theme = useTheme()
   const {
@@ -289,7 +289,7 @@ export function InsightsHomePage() {
         impacto: margemPct < 15 ? 'Rever CMV' : 'Saudável',
         pct: clampScore(margemPct * 2),
         hint: undefined,
-        to: '/margens',
+        to: '/insights/financeiro',
       },
     ]
   }, [data, cobertura])
@@ -435,7 +435,7 @@ export function InsightsHomePage() {
                   hint="vs período anterior · vendas válidas"
                   icon="buy"
                   tone="perf"
-                  to="/vendas"
+                  to="/insights/comercial"
                   cta="Ver indicadores"
                 />
               </Grid>
@@ -599,7 +599,7 @@ export function InsightsHomePage() {
                       color="text.secondary"
                       sx={{ display: 'block', mb: 1.5 }}
                     >
-                      Prioridade relativa — clique para aprofundar no Insights ou Business
+                      Prioridade relativa — clique para aprofundar nos Insights
                     </Typography>
                     <Stack spacing={1.5}>
                       {frentes.map((f) => (

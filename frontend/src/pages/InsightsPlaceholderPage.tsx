@@ -25,7 +25,7 @@ const COPY: Record<
     title: 'Insights',
     pdf: 'pág. 12 — Visão executiva / principais insights',
     blurb:
-      'Resumo narrativo do que mais importa: vendas, margem, fiscal, sync e prioridades — cards de insight + radar, não só KPIs crus (isso fica no Business).',
+      'Resumo narrativo do que mais importa: vendas, margem, fiscal, sync e prioridades — cards de insight + radar, não só KPIs crus (isso fica nos Insights).',
     dados: 'overview · ops/alerts · margens · agenda/tarefas',
     fase: '1',
   },
@@ -33,7 +33,7 @@ const COPY: Record<
     title: 'Alertas',
     pdf: 'pág. 13 — Alertas do dia',
     blurb:
-      'Severidade, ranking e histórico curto dos alertas operacionais (CMV/NF, sync, UpSeller). A Home Business já mostra um pedaço; aqui é o painel completo.',
+      'Severidade, ranking e histórico curto dos alertas operacionais (CMV/NF, sync, UpSeller). A Home Insights já mostra um pedaço; aqui é o painel completo.',
     dados: '/ops/alerts · margin_gap · sync',
     fase: '1',
   },
@@ -49,7 +49,7 @@ const COPY: Record<
     title: 'Comercial',
     pdf: 'pág. 16 — Comercial inteligente',
     blurb:
-      'Funil, canais, ticket e tendência com leitura de insight (não a grelha operacional de Pedidos/Vendas do Business).',
+      'Funil, canais, ticket e tendência com leitura de insight (não a grelha operacional de Pedidos/Vendas do knowt).',
     dados: 'dashboard · métricas · canais · status pedidos',
     fase: '2',
   },
@@ -73,7 +73,7 @@ const COPY: Record<
     title: 'Financeiro',
     pdf: 'pág. 21 — Financeiro inteligente',
     blurb:
-      'Fluxo receita × taxas × líquido, margem/CMV e despesas — leitura de insight sobre os mesmos números do Business.',
+      'Fluxo receita × taxas × líquido, margem/CMV e despesas — leitura de insight sobre os mesmos números do knowt.',
     dados: 'métricas · margens · pagamentos · despesas',
     fase: '2',
   },
@@ -92,8 +92,8 @@ export function InsightsPlaceholderPage({ domain }: Props) {
       <Card>
         <CardContent>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Modo <strong>Insights</strong> — fase {meta.fase}. O Business continua a ser o operacional
-            padrão; esta aba recebe narrativa, alertas e recomendações.
+            Modo <strong>Insights</strong> — fase {meta.fase}. No piloto knowt toda a navegação fica
+            nesta lane (Insights + Agenda).
           </Alert>
           <Typography color="text.secondary" sx={{ mb: 1.5 }}>
             {meta.blurb}
@@ -105,8 +105,8 @@ export function InsightsPlaceholderPage({ domain }: Props) {
             <Button component={RouterLink} to="/insights" variant="contained" sx={{ textTransform: 'none' }}>
               Resumo Insights
             </Button>
-            <Button component={RouterLink} to="/" variant="outlined" sx={{ textTransform: 'none' }}>
-              Ir ao Business
+            <Button component={RouterLink} to="/insights/agenda" variant="outlined" sx={{ textTransform: 'none' }}>
+              Abrir Agenda
             </Button>
           </Stack>
         </CardContent>

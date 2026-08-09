@@ -50,7 +50,7 @@ const PRIORITY_CHIP: Record<string, { label: string; color: 'error' | 'warning' 
   low: { label: 'Baixa', color: 'default' },
 }
 
-/** Coluna compacta estilo PDF pág.12 — diferente da Agenda Business completa. */
+/** Coluna compacta estilo PDF pág.12 — diferida da Agenda completa em /insights/agenda. */
 export function InsightsAgendaColumn() {
   const theme = useTheme()
   const [events, setEvents] = useState<AgendaEvent[]>([])

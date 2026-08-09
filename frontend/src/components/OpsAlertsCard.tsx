@@ -98,7 +98,7 @@ export function OpsAlertsCard() {
               ·{' '}
               <Typography
                 component={RouterLink}
-                to="/fiscal"
+                to="/insights/financeiro"
                 variant="caption"
                 sx={{ color: 'primary.main', fontWeight: 700, textDecoration: 'none' }}
               >
@@ -107,7 +107,7 @@ export function OpsAlertsCard() {
               {' · '}
               <Typography
                 component={RouterLink}
-                to="/margens"
+                to="/insights/financeiro"
                 variant="caption"
                 sx={{ color: 'primary.main', fontWeight: 700, textDecoration: 'none' }}
               >
@@ -125,7 +125,7 @@ export function OpsAlertsCard() {
               ·{' '}
               <Typography
                 component={RouterLink}
-                to="/fiscal"
+                to="/insights/financeiro"
                 variant="caption"
                 sx={{ color: 'primary.main', fontWeight: 700, textDecoration: 'none' }}
               >
@@ -141,7 +141,7 @@ export function OpsAlertsCard() {
                 alert.code?.includes('nf') ||
                 alert.code?.includes('margin') ||
                 alert.title?.toLowerCase().includes('nf') ? (
-                  <Button component={RouterLink} to="/fiscal" color="inherit" size="small">
+                  <Button component={RouterLink} to="/insights/financeiro" color="inherit" size="small">
                     Fiscal
                   </Button>
                 ) : undefined

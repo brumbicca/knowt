@@ -318,7 +318,7 @@ export function InsightsAlertasPage() {
           </Button>
           <Link
             component={RouterLink}
-            to="/operacoes"
+            to="/insights/prioridades"
             underline="hover"
             fontWeight={600}
             sx={{ fontSize: '0.85rem' }}
@@ -355,7 +355,7 @@ export function InsightsAlertasPage() {
               icon: 'report' as const,
               color: theme.palette.error.main,
               cta: 'Ver detalhes',
-              to: '/fiscal',
+              to: '/insights/financeiro',
             },
             {
               id: 'warning' as FilterSev,
@@ -375,7 +375,7 @@ export function InsightsAlertasPage() {
               icon: 'document' as const,
               color: chart.pie[5] || theme.palette.info.main,
               cta: 'Ver lista',
-              to: '/operacoes',
+              to: '/insights/prioridades',
             },
             {
               id: 'all' as FilterSev,
@@ -388,7 +388,7 @@ export function InsightsAlertasPage() {
               icon: 'archive' as const,
               color: theme.palette.error.light,
               cta: 'Abrir Fiscal',
-              to: '/fiscal',
+              to: '/insights/financeiro',
             },
             {
               id: 'all' as FilterSev,
@@ -554,7 +554,7 @@ export function InsightsAlertasPage() {
               <Box sx={{ textAlign: 'center', mt: 1.5 }}>
                 <Link
                   component={RouterLink}
-                  to="/operacoes"
+                  to="/insights/prioridades"
                   underline="hover"
                   fontWeight={600}
                   sx={{ fontSize: '0.85rem' }}
@@ -587,12 +587,12 @@ export function InsightsAlertasPage() {
                   {
                     title: 'Abrir conciliação fiscal',
                     detail: 'Ver pedidos sem nota por canal e fechar o gap.',
-                    to: '/fiscal',
+                    to: '/insights/financeiro',
                   },
                   {
                     title: 'Rever operações',
                     detail: 'Status de sync, lojas e últimas execuções.',
-                    to: '/operacoes',
+                    to: '/insights/prioridades',
                   },
                 ],
               }}

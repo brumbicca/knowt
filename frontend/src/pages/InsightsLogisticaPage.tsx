@@ -441,7 +441,7 @@ export function InsightsLogisticaPage() {
         {
           title: gapSemNf > 0 ? `Fechar ${Math.min(gapSemNf, 20)} gaps sem NF` : 'Auditar NF × envio',
           detail: 'Pedidos sem nota travam a leitura fiscal e o pós-venda.',
-          to: '/fiscal',
+          to: '/insights/financeiro',
         },
         {
           title: 'Revisar faixas de frete caras',
@@ -453,7 +453,7 @@ export function InsightsLogisticaPage() {
           detail: emTransito
             ? `${emTransito} enviados na amostra — cruzar com NF e cliente.`
             : 'Acompanhar status Enviado/Pago no funil de pedidos.',
-          to: '/pedidos',
+          to: '/insights/comercial',
         },
       ] as const,
     [gapSemNf, emTransito],

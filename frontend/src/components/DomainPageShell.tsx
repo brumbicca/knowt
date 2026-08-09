@@ -14,28 +14,28 @@ import {
 
 const RELATED: Record<string, Array<{ to: string; label: string }>> = {
   Vendas: [
-    { to: '/pedidos', label: 'Pedidos' },
+    { to: '/insights/comercial', label: 'Pedidos' },
     { to: '/produtos', label: 'Produtos' },
   ],
   Pedidos: [
-    { to: '/fiscal', label: 'Fiscal' },
-    { to: '/margens', label: 'Margens' },
+    { to: '/insights/financeiro', label: 'Fiscal' },
+    { to: '/insights/financeiro', label: 'Margens' },
   ],
   'Margens & CMV': [
-    { to: '/fiscal', label: 'Fiscal' },
-    { to: '/pedidos', label: 'Pedidos' },
+    { to: '/insights/financeiro', label: 'Fiscal' },
+    { to: '/insights/comercial', label: 'Pedidos' },
   ],
   'Fiscal (NF)': [
-    { to: '/margens', label: 'Margens' },
-    { to: '/pedidos', label: 'Pedidos' },
+    { to: '/insights/financeiro', label: 'Margens' },
+    { to: '/insights/comercial', label: 'Pedidos' },
   ],
-  Fretes: [{ to: '/pedidos', label: 'Pedidos' }],
+  Fretes: [{ to: '/insights/comercial', label: 'Pedidos' }],
   Despesas: [],
-  Clientes: [{ to: '/pedidos', label: 'Pedidos' }],
-  Pagamentos: [{ to: '/pedidos', label: 'Pedidos' }],
-  Produtos: [{ to: '/pedidos', label: 'Pedidos' }],
-  Operações: [{ to: '/fiscal', label: 'Fiscal' }],
-  'Agenda & Tarefas': [],
+  Clientes: [{ to: '/insights/comercial', label: 'Pedidos' }],
+  Pagamentos: [{ to: '/insights/comercial', label: 'Pedidos' }],
+  Produtos: [{ to: '/insights/comercial', label: 'Pedidos' }],
+  Operações: [{ to: '/insights/financeiro', label: 'Fiscal' }],
+  'Agenda & Tarefas': [{ to: '/insights', label: 'Insights' }],
   Insights: [
     { to: '/insights/alertas', label: 'Alertas' },
     { to: '/insights/prioridades', label: 'Prioridades' },
@@ -83,7 +83,7 @@ export function DomainPageShell({
   children: ReactNode
   stats?: Array<{ label: string; value: string; hint?: string }>
 }) {
-  const related = RELATED[title] || [{ to: '/', label: 'Home' }]
+  const related = RELATED[title] || [{ to: '/insights', label: 'Insights' }]
 
   return (
     <Stack spacing={2.5}>
@@ -91,7 +91,7 @@ export function DomainPageShell({
         <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
           <Chip
             component={RouterLink}
-            to="/"
+            to="/insights"
             clickable
             size="small"
             label="Home"

@@ -676,7 +676,7 @@ export function AgendaPage() {
           >
             <AiInsightPanel
               dominio="agenda"
-              ctaTo="/agenda"
+              ctaTo="/insights/agenda"
               ctaLabel="Ver tarefas da semana"
               fallback={{
                 title: openTasks

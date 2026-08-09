@@ -329,7 +329,7 @@ export function InsightsPrioridadesPage() {
         prazoDate: today,
         status,
         source: 'alerta',
-        href: area === 'Fiscal' ? '/fiscal' : area === 'Margem' ? '/margens' : '/operacoes',
+        href: area === 'Fiscal' ? '/insights/financeiro' : area === 'Margem' ? '/insights/financeiro' : '/insights/prioridades',
       })
     }
 
@@ -344,7 +344,7 @@ export function InsightsPrioridadesPage() {
         prazoDate: null,
         status: 'andamento',
         source: 'gap',
-        href: '/fiscal',
+        href: '/insights/financeiro',
       })
     }
 
@@ -359,7 +359,7 @@ export function InsightsPrioridadesPage() {
         prazoDate: null,
         status: 'andamento',
         source: 'gap',
-        href: '/margens',
+        href: '/insights/financeiro',
       })
     }
 
@@ -751,7 +751,7 @@ export function InsightsPrioridadesPage() {
           >
             <AiInsightPanel
               dominio="home"
-              ctaTo="/agenda"
+              ctaTo="/insights/agenda"
               ctaLabel="Ver plano completo da semana"
               fallback={{
                 title:
