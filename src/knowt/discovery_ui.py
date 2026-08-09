@@ -814,6 +814,192 @@ def probe_system(
     return _persist_evidence(data_dir, out, kind="ui_system_map")
 
 
+MAIN_MENUS = ("Cadastros", "Suprimentos", "Vendas", "Finanças")
+SKIP_HREF_MARKERS = (
+    "indique-e-ganhe",
+    "comunicacao.olist",
+    "info.olist.com",
+    "conta_digital",
+    "loja_aplicativos",
+    "ideias",
+    "detalhes_versao",
+    "utm=",
+    "javascript:",
+    "openid",
+    "accounts.tiny",
+)
+
+
+def _is_crawlable_erp_href(href: str) -> bool:
+    h = (href or "").strip()
+    if not h.startswith("https://erp.olist.com"):
+        return False
+    low = h.lower()
+    return not any(m in low for m in SKIP_HREF_MARKERS)
+
+
+def _slug_from_href(href: str) -> str:
+    path = href.split("erp.olist.com", 1)[-1]
+    path = path.split("?", 1)[0].split("#", 1)[0].strip("/") or "home"
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", path).strip("_").lower()
+    return (slug or "page")[:60]
+
+
+def probe_system_expand(
+    data_dir: Path,
+    *,
+    source_id: str = "tinyerp",
+    headless: bool = True,
+    timeout_ms: int = 45_000,
+    max_pages: int = 35,
+) -> Dict[str, Any]:
+    """Abre menus laterais, inventaria sublinks e visita páginas novas do ERP."""
+    from playwright.sync_api import sync_playwright
+
+    state = storage_state_path(data_dir, source_id)
+    out: Dict[str, Any] = {
+        "version": 1,
+        "kind": "ui_system_map_expand",
+        "quality": "observation",
+        "at": _now_iso(),
+        "source_id": source_id,
+        "ok": False,
+        "login_wall": False,
+        "state_path": str(state),
+        "menus_opened": [],
+        "discovered_links": [],
+        "pages": [],
+        "hypothesis": (
+            "Expand crawl: inventário de submenus — ainda não publica capabilities."
+        ),
+        "error": None,
+        "hint": None,
+    }
+    if not has_storage_state(data_dir, source_id):
+        out["error"] = "storage_state_missing"
+        out["hint"] = "python scripts/run_discovery_ui.py login"
+        return _persist_evidence(data_dir, out, kind="ui_system_map_expand")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=headless)
+            context = browser.new_context(locale="pt-BR", storage_state=str(state))
+            page = context.new_page()
+            page.goto(DEFAULT_BASE_URL, wait_until="domcontentloaded", timeout=timeout_ms)
+            page.wait_for_timeout(1500)
+            title = (page.title() or "").strip()
+            cur = page.url
+            try:
+                body = page.inner_text("body")[:300]
+            except Exception:
+                body = ""
+            if _looks_like_login(cur, title, body):
+                out["login_wall"] = True
+                out["error"] = "login_wall"
+                browser.close()
+                return _persist_evidence(data_dir, out, kind="ui_system_map_expand")
+
+            discovered: Dict[str, Dict[str, str]] = {}
+            # seeds conhecidas
+            for t in TINY_SYSTEM_TARGETS:
+                href = t["url"]
+                if _is_crawlable_erp_href(href):
+                    discovered[href] = {
+                        "text": t["label"],
+                        "href": href,
+                        "via": "seed",
+                    }
+
+            for menu in MAIN_MENUS:
+                try:
+                    page.goto(DEFAULT_BASE_URL, wait_until="domcontentloaded", timeout=timeout_ms)
+                    page.wait_for_timeout(800)
+                    page.get_by_role("link", name=menu, exact=True).first.click(timeout=3500)
+                    page.wait_for_timeout(900)
+                    links = _collect_nav_links(page, limit=100)
+                    # também links sob o item de menu aberto
+                    more = page.evaluate(
+                        """() => {
+                          const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+                          const out = [];
+                          const roots = Array.from(document.querySelectorAll('aside, nav, [class*=menu], [class*=Menu], [class*=sidebar]'));
+                          for (const root of roots) {
+                            for (const a of Array.from(root.querySelectorAll('a[href]'))) {
+                              const href = (a.href || '').trim();
+                              const text = norm(a.innerText);
+                              if (!href || !text) continue;
+                              out.push({ text: text.slice(0, 80), href });
+                            }
+                          }
+                          return out.slice(0, 120);
+                        }"""
+                    )
+                    out["menus_opened"].append(
+                        {"menu": menu, "nav_count": len(links), "more_count": len(more or [])}
+                    )
+                    for item in list(links) + list(more or []):
+                        href = (item.get("href") or "").strip()
+                        if not _is_crawlable_erp_href(href):
+                            continue
+                        if href not in discovered:
+                            discovered[href] = {
+                                "text": (item.get("text") or "").strip()[:80],
+                                "href": href,
+                                "via": menu,
+                            }
+                except Exception as exc:
+                    out["menus_opened"].append(
+                        {"menu": menu, "error": f"{type(exc).__name__}:{exc}"[:120]}
+                    )
+
+            # dedupe por path sem hash/query preferindo primeiro
+            seen_path: set[str] = set()
+            ordered: List[Dict[str, str]] = []
+            for href, meta in discovered.items():
+                path_key = href.split("#", 1)[0].split("?", 1)[0]
+                if path_key in seen_path:
+                    continue
+                seen_path.add(path_key)
+                ordered.append(meta)
+            out["discovered_links"] = ordered
+            out["discovered_total"] = len(ordered)
+
+            pages: List[Dict[str, Any]] = []
+            for meta in ordered[: max(1, int(max_pages))]:
+                href = meta["href"]
+                label = meta.get("text") or _slug_from_href(href)
+                key = _slug_from_href(href)
+                try:
+                    page.goto(href, wait_until="domcontentloaded", timeout=timeout_ms)
+                    page.wait_for_timeout(1200)
+                    snap = _snapshot_page(page, key=key, label=label, domain=meta.get("via") or "")
+                    snap["via"] = meta.get("via")
+                    pages.append(snap)
+                except Exception as exc:
+                    pages.append(
+                        {
+                            "key": key,
+                            "label": label,
+                            "url": href,
+                            "via": meta.get("via"),
+                            "ok": False,
+                            "error": f"{type(exc).__name__}:{exc}"[:180],
+                        }
+                    )
+
+            browser.close()
+            out["pages"] = pages
+            out["pages_ok"] = sum(1 for pg in pages if pg.get("ok"))
+            out["pages_total"] = len(pages)
+            out["ok"] = out["pages_ok"] >= 1
+            if not out["ok"]:
+                out["error"] = "expand_crawl_weak"
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"probe_exception:{type(exc).__name__}:{exc}"
+
+    return _persist_evidence(data_dir, out, kind="ui_system_map_expand")
+
+
 MARGIN_REPORT_TARGETS = (
     {
         "key": "avaliacao_margem",
@@ -1153,6 +1339,16 @@ def load_latest_system_map(data_dir: Path) -> Optional[Dict[str, Any]]:
 
 def load_latest_margin_reports(data_dir: Path) -> Optional[Dict[str, Any]]:
     path = evidence_dir(data_dir) / "ui_margin_reports_latest.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def load_latest_system_map_expand(data_dir: Path) -> Optional[Dict[str, Any]]:
+    path = evidence_dir(data_dir) / "ui_system_map_expand_latest.json"
     if not path.is_file():
         return None
     try:

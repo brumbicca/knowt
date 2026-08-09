@@ -26,6 +26,7 @@ from knowt.discovery_ui import (
     probe_margin_reports,
     probe_product_costs,
     probe_system,
+    probe_system_expand,
     storage_state_path,
 )
 
@@ -63,6 +64,13 @@ def main() -> int:
         action="store_true",
         help="Só as primeiras 3 páginas (smoke rápido)",
     )
+
+    p_exp = sub.add_parser(
+        "probe-system-expand",
+        help="Abre menus laterais e visita sublinks ainda não mapeados",
+    )
+    p_exp.add_argument("--headed", action="store_true")
+    p_exp.add_argument("--max-pages", type=int, default=35)
 
     p_marg = sub.add_parser(
         "probe-margin-reports",
@@ -109,6 +117,44 @@ def main() -> int:
                             "title": p.get("page_title"),
                             "tabs": (p.get("tabs") or [])[:8],
                             "table_headers": (p.get("table_headers") or [])[:10],
+                        }
+                        for p in pages
+                    ],
+                    "error": evidence.get("error"),
+                    "login_wall": evidence.get("login_wall"),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if evidence.get("ok") else 3
+
+    if args.cmd == "probe-system-expand":
+        if not has_storage_state(settings.data_dir):
+            return _need_state(settings.data_dir)
+        evidence = probe_system_expand(
+            settings.data_dir,
+            headless=not args.headed,
+            max_pages=args.max_pages,
+        )
+        pages = evidence.get("pages") or []
+        print(
+            json.dumps(
+                {
+                    "ok": evidence.get("ok"),
+                    "path": evidence.get("path"),
+                    "menus_opened": evidence.get("menus_opened"),
+                    "discovered_total": evidence.get("discovered_total"),
+                    "pages_ok": evidence.get("pages_ok"),
+                    "pages_total": evidence.get("pages_total"),
+                    "pages": [
+                        {
+                            "key": p.get("key"),
+                            "ok": p.get("ok"),
+                            "label": p.get("label"),
+                            "via": p.get("via"),
+                            "title": p.get("page_title"),
+                            "url": p.get("url"),
                         }
                         for p in pages
                     ],
