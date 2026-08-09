@@ -1,8 +1,10 @@
 """Respostas determinísticas pós-enforcement (sem LLM no MVP)."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from knowt.chat_actions import try_chat_action
 from knowt.enforcement import EnforcementResult, enforce
 from knowt.order_id import extract_order_id
 from knowt.period import parse_period
@@ -68,7 +70,13 @@ def answer_chat(
     *,
     message: str,
     source_id: str = "tinyerp",
+    data_dir: Path | str | None = None,
 ) -> Dict[str, Any]:
+    if data_dir is not None:
+        action = try_chat_action(Path(data_dir), message)
+        if action is not None:
+            return action
+
     enf: EnforcementResult = enforce(registry, message=message, source_id=source_id)
     out: Dict[str, Any] = {"enforcement": enf.to_dict(), "answer": None, "data": None}
 

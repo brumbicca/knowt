@@ -259,7 +259,7 @@ def create_bi_bridge_blueprint(
                 "recomendacoes": [
                     {
                         "titulo": "Perguntar no chat",
-                        "detalhe": "Ex.: «resumo de pedidos esta semana» ou «pedido <id>»",
+                        "detalhe": "Ex.: «resumo de pedidos…», «cria uma tarefa…», «agenda call amanhã às 15h»",
                         "tipo": "acao",
                     }
                 ],
@@ -402,7 +402,12 @@ def create_bi_bridge_blueprint(
             source_id = str(ctx.get("source_id")).strip() or "tinyerp"
         if not message:
             return jsonify({"ok": False, "error": "empty", "message": "Mensagem vazia"})
-        result = answer_chat(registry, message=message, source_id=source_id)
+        result = answer_chat(
+            registry,
+            message=message,
+            source_id=source_id,
+            data_dir=data_dir,
+        )
         try:
             append_answer_audit(
                 audit_path_for(data_dir),

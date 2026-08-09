@@ -92,7 +92,8 @@ def format_source_catalog(registry: SourceRegistry, source_id: str) -> str:
     )
     lines.append(
         "Exemplos: «pedidos esta semana», «pedidos cancelados últimos 7 dias», "
-        "«resumo de pedidos esta semana», «pedido 752095868»."
+        "«resumo de pedidos esta semana», «pedido 752095868», "
+        "«cria uma tarefa Revisar Tiny», «agenda call amanhã às 15h»."
     )
     return "\n".join(lines)
 

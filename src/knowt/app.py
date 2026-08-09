@@ -122,7 +122,12 @@ def create_app(settings: Settings | None = None) -> Flask:
         source_id = (payload.get("source_id") or "tinyerp").strip()
         if not message:
             return jsonify({"ok": False, "message": "Mensagem vazia."}), 400
-        result = answer_chat(registry, message=message, source_id=source_id)
+        result = answer_chat(
+            registry,
+            message=message,
+            source_id=source_id,
+            data_dir=settings.data_dir,
+        )
         try:
             append_answer_audit(
                 audit_path_for(settings.data_dir),
@@ -163,7 +168,12 @@ def create_app(settings: Settings | None = None) -> Flask:
         payload = request.get_json(silent=True) or {}
         message = (payload.get("message") or "").strip()
         source_id = (payload.get("source_id") or "tinyerp").strip()
-        result = answer_chat(registry, message=message, source_id=source_id)
+        result = answer_chat(
+            registry,
+            message=message,
+            source_id=source_id,
+            data_dir=settings.data_dir,
+        )
         try:
             append_answer_audit(
                 audit_path_for(settings.data_dir),
