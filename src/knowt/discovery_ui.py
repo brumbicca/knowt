@@ -155,18 +155,28 @@ def login_interactive(
     source_id: str = "tinyerp",
     base_url: str = DEFAULT_BASE_URL,
     timeout_ms: int = 600_000,
+    poll_auth: bool = True,
 ) -> Path:
-    """Abre Chromium headed; humano faz login; grava storage_state."""
+    """Abre Chromium headed; humano faz login; grava storage_state.
+
+    Se poll_auth=True, espera até a URL parecer autenticada (sem Enter).
+    Se False, espera Enter no terminal (modo clássico Fiesta).
+    """
     from playwright.sync_api import sync_playwright
+    import time
 
     path = storage_state_path(data_dir, source_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     url = (base_url or DEFAULT_BASE_URL).strip()
+    deadline = time.time() + (timeout_ms / 1000.0)
 
     print(f"[knowt-ui] Abrindo {url}")
     print("[knowt-ui] Faça login até VER o ERP (menus Vendas/Cadastros…).")
-    print("[knowt-ui] Depois volte ao terminal e pressione Enter.")
     print(f"[knowt-ui] Estado → {path}")
+    if poll_auth:
+        print("[knowt-ui] Vou gravar sozinho quando detectar o ERP (não precisa Enter).")
+    else:
+        print("[knowt-ui] Depois volte ao terminal e pressione Enter.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -174,6 +184,24 @@ def login_interactive(
         page = context.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=120_000)
         while True:
+            if poll_auth:
+                try:
+                    cur = page.url
+                    title = (page.title() or "").strip()
+                except Exception:
+                    cur, title = "", ""
+                if _session_looks_authenticated(cur, title):
+                    print(f"[knowt-ui] Sessão OK — {cur}")
+                    break
+                if time.time() >= deadline:
+                    context.storage_state(path=str(path))
+                    browser.close()
+                    raise TimeoutError(
+                        "Timeout à espera do login ERP. "
+                        f"Última URL: {cur}"
+                    )
+                time.sleep(1.5)
+                continue
             try:
                 input()
             except EOFError:
@@ -197,59 +225,96 @@ def login_interactive(
     return path
 
 
+def parse_cost_pairs_from_body_text(body: str) -> List[Tuple[str, str]]:
+    """Fallback: cabeçalho (tabs) + células em linhas subsequentes (UI Olist)."""
+    if not body:
+        return []
+    lines = [ln.strip() for ln in body.splitlines()]
+    header_idx = -1
+    headers: List[str] = []
+    for i, ln in enumerate(lines):
+        if not ln:
+            continue
+        low = normalize_label(ln)
+        if "preco custo" not in low or "custo medio" not in low:
+            continue
+        if "\t" in ln:
+            headers = [h.strip() for h in ln.split("\t") if h.strip()]
+        else:
+            headers = [h.strip() for h in re.split(r"\s{2,}", ln) if h.strip()]
+        if len(headers) >= 2:
+            header_idx = i
+            break
+    if header_idx < 0 or not headers:
+        return []
+
+    rest = "\n".join(lines[header_idx + 1 :])
+    tokens = [t.strip() for t in re.split(r"[\t\n\r]+", rest) if t.strip()]
+    ncols = len(headers)
+    if len(tokens) < ncols:
+        return []
+    rows: List[List[str]] = []
+    for i in range(0, len(tokens) - ncols + 1, ncols):
+        chunk = tokens[i : i + ncols]
+        if len(chunk) == ncols:
+            rows.append(chunk)
+    if not rows:
+        return []
+    # Preferir a última linha com números nos campos de custo
+    best = rows[-1]
+    for chunk in reversed(rows):
+        if any(re.search(r"\d", c) for c in chunk):
+            best = chunk
+            break
+    return [(headers[j], best[j]) for j in range(ncols)]
+
+
 def _extract_cost_pairs_from_page(page) -> List[Tuple[str, str]]:
-    """Lê tabela da aba custos: cabeçalhos × última linha com valores."""
-    return page.evaluate(
+    """Lê tabela da aba custos; fallback para texto do body."""
+    raw = page.evaluate(
         """() => {
           const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
-          const tables = Array.from(document.querySelectorAll('table'));
+          const roots = Array.from(document.querySelectorAll('table, [role=table], [role=grid]'));
           const pairs = [];
-          for (const table of tables) {
-            const headers = Array.from(table.querySelectorAll('thead th, tr th'))
+          for (const table of roots) {
+            const headers = Array.from(
+              table.querySelectorAll('thead th, tr th, [role=columnheader]')
+            )
               .map((el) => norm(el.innerText))
               .filter(Boolean);
-            if (!headers.length) continue
+            if (!headers.length) continue;
             const joined = headers.join(' ').toLowerCase();
             if (!joined.includes('custo') && !joined.includes('preço') && !joined.includes('preco')) {
               continue;
             }
-            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const rows = Array.from(table.querySelectorAll('tbody tr, tr, [role=row]'));
             let best = null;
             for (const row of rows) {
-              const cells = Array.from(row.querySelectorAll('td')).map((el) => norm(el.innerText));
+              const cells = Array.from(
+                row.querySelectorAll('td, [role=gridcell]')
+              ).map((el) => norm(el.innerText));
               if (!cells.length) continue;
-              const hasNum = cells.some((c) => /\\d/.test(c));
-              if (hasNum) best = cells;
+              if (cells.some((c) => /\\d/.test(c))) best = cells;
             }
             if (!best) continue;
             const n = Math.min(headers.length, best.length);
-            for (let i = 0; i < n; i++) {
-              pairs.push([headers[i], best[i]]);
-            }
+            for (let i = 0; i < n; i++) pairs.push([headers[i], best[i]]);
             if (pairs.length) break;
-          }
-          // fallback: labels próximos a inputs com "custo"
-          if (!pairs.length) {
-            const labels = Array.from(document.querySelectorAll('label, th, dt, .label, [class*="label"]'));
-            for (const el of labels) {
-              const text = norm(el.innerText);
-              if (!/custo/i.test(text)) continue;
-              let val = '';
-              const forId = el.getAttribute('for');
-              if (forId) {
-                const inp = document.getElementById(forId);
-                if (inp) val = norm(inp.value || inp.innerText);
-              }
-              if (!val) {
-                const sib = el.nextElementSibling;
-                if (sib) val = norm(sib.value || sib.innerText);
-              }
-              if (text && val) pairs.push([text, val]);
-            }
           }
           return pairs;
         }"""
     )
+    typed: List[Tuple[str, str]] = []
+    for item in raw or []:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            typed.append((str(item[0]), str(item[1])))
+    if typed:
+        return typed
+    try:
+        body = page.locator("body").inner_text(timeout=4000)
+    except Exception:
+        body = ""
+    return parse_cost_pairs_from_body_text(body)
 
 
 def probe_product_costs(
@@ -378,23 +443,29 @@ def probe_product_costs(
                     browser.close()
                     return _persist_evidence(data_dir, out)
 
-            page.wait_for_timeout(1200)
-            pairs = _extract_cost_pairs_from_page(page) or []
-            # pairs may come as list of lists from JS
-            typed: List[Tuple[str, str]] = []
-            for item in pairs:
-                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                    typed.append((str(item[0]), str(item[1])))
+            page.wait_for_timeout(2800)
+            typed = _extract_cost_pairs_from_page(page) or []
             out["fields"] = fields_from_header_value_pairs(typed)
             out["ok"] = any(f.get("found") for f in out["fields"])
+            try:
+                full_body = page.locator("body").inner_text(timeout=4000)
+                out["page"]["body_preview"] = full_body[:600] if full_body else None
+                if not out["ok"]:
+                    typed = parse_cost_pairs_from_body_text(full_body)
+                    out["fields"] = fields_from_header_value_pairs(typed)
+                    out["ok"] = any(f.get("found") for f in out["fields"])
+            except Exception:
+                full_body = ""
             if not out["ok"]:
                 out["error"] = "cost_fields_not_found"
-                try:
-                    out["page"]["body_preview"] = page.locator("body").inner_text(
-                        timeout=3000
-                    )[:400]
-                except Exception:
-                    pass
+            else:
+                out["error"] = None
+                # nome a partir do body se vazio
+                if not out["product"].get("name") and full_body:
+                    for ln in full_body.splitlines():
+                        if "Copo" in ln or "Bello" in ln:
+                            out["product"]["name"] = ln.strip()[:200]
+                            break
 
             browser.close()
     except Exception as exc:  # noqa: BLE001 — evidência de falha
