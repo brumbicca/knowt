@@ -32,6 +32,7 @@ class TinyOrderPreview:
     numero: Optional[str] = None
     situacao: Optional[str] = None
     data_pedido: Optional[str] = None
+    valor: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -48,6 +49,9 @@ class TinyOrdersPage:
     order_count: int = 0
     order_ids: List[str] = field(default_factory=list)
     order_previews: List[Dict[str, Any]] = field(default_factory=list)
+    # Soma dos `valor` presentes nesta página (só evidência; não extrapolada).
+    page_valor_sum: Optional[float] = None
+    page_valor_parsed: int = 0
     detail: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -169,6 +173,8 @@ def fetch_orders_page(
 
     ids: List[str] = []
     previews: List[Dict[str, Any]] = []
+    valor_sum = 0.0
+    valor_parsed = 0
     for row in pedidos:
         if not isinstance(row, dict):
             continue
@@ -180,6 +186,14 @@ def fetch_orders_page(
             continue
         oid_s = str(oid)
         ids.append(oid_s)
+        raw_valor = ped.get("valor") or ped.get("total_pedido") or ped.get("total")
+        valor_s = str(raw_valor).strip() if raw_valor is not None else None
+        if valor_s:
+            try:
+                valor_sum += float(valor_s.replace(",", "."))
+                valor_parsed += 1
+            except ValueError:
+                pass
         if len(previews) < 8:
             numero = ped.get("numero")
             situacao = ped.get("situacao") or ped.get("descricao_situacao")
@@ -190,6 +204,7 @@ def fetch_orders_page(
                     numero=str(numero) if numero is not None else None,
                     situacao=str(situacao) if situacao else None,
                     data_pedido=str(data_p) if data_p else None,
+                    valor=valor_s,
                 ).to_dict()
             )
 
@@ -214,6 +229,8 @@ def fetch_orders_page(
         order_count=len(ids),
         order_ids=ids[:50],
         order_previews=previews,
+        page_valor_sum=round(valor_sum, 2) if valor_parsed else None,
+        page_valor_parsed=valor_parsed,
         detail="page_ok",
     )
 

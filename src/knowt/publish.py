@@ -1,7 +1,10 @@
 """Publicação explícita de capabilities (não automática no discovery)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from knowt.models import Capability
+from knowt.sales_gates import can_publish_sales_summary
 from knowt.sources import SourceRegistry
 
 
@@ -69,17 +72,46 @@ def publish_orders_detail_live(
     )
 
 
+def publish_sales_summary_live(
+    registry: SourceRegistry,
+    data_dir: Path,
+    *,
+    source_id: str = "tinyerp",
+) -> Capability:
+    """Só publica se os gates de negócio estiverem aprovados."""
+    ok, missing = can_publish_sales_summary(data_dir)
+    if not ok:
+        raise PermissionError(
+            "sales.summary bloqueada — faltam gates: " + ", ".join(missing)
+        )
+    return set_capability_status(
+        registry,
+        source_id=source_id,
+        capability_id="sales.summary",
+        status="live",
+        quality="machine_validated",
+        description=(
+            "Resumo de vendas Tiny — publicado só após checklist de negócio "
+            "(sales_summary_gates.json)."
+        ),
+    )
+
+
 def ensure_tiny_capability_slots(
     registry: SourceRegistry, source_id: str = "tinyerp"
 ) -> None:
-    """Garante slots sales/orders no registry sem demover o que já está live."""
+    """Garante slots sales/orders/margins no registry sem demover o que já está live."""
     src = registry.get(source_id)
     if not src:
         return
     wanted = {
         "sales.summary": (
             "sales",
-            "Resumo de vendas — só live após discovery+validação",
+            "Resumo de vendas — só live após discovery+validação de negócio",
+        ),
+        "margins.summary": (
+            "margins",
+            "Margem/CMV — só live após pacote §28c.1 / gates knowt",
         ),
         "orders.list": (
             "orders",

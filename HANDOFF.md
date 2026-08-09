@@ -51,7 +51,9 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
 | Tiny `orders.list` | **live** — contagem por período, situação, **resumo/breakdown** por situação |
 | Tiny `orders.detail` | **live** — situação, cliente, itens, ecommerce, valor Tiny (sem CMV) |
-| Tiny `sales.summary` | ainda `unavailable` |
+| Tiny `sales.summary` | ainda `unavailable` — probe+gates em `docs/SALES_SUMMARY_PACOTE.md` |
+| Tiny `margins.summary` | `unavailable` (slot criado; sem publish) |
+| Evidence sales | `/root/knowt-data/evidence/sales_probe_*.json` + `sales_summary_gates.json` |
 | Data path | `/root/knowt-data` |
 | API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
 | Chat answer | `POST /v1/chat/answer` · períodos + situação · Bearer `KNOWT_API_TOKEN` |
@@ -87,7 +89,8 @@ Até lá a API fica só em loopback + Bearer `KNOWT_API_TOKEN`.
 5. Extrair/adaptar discovery real Tiny (mais endpoints)  
 6. ~~DNS knowt + Nginx/TLS (+ firewall 80/443)~~  
 7. ~~Chat web piloto em knowt.com.br~~ · Hermes Telegram/WhatsApp ainda TBD  
-8. `sales.summary` / margem só com validação de negócio (não publicar cego)  
+8. ~~Pacote técnico sales.summary (probe + gates, sem publish)~~ · publish live só após checklist de negócio  
+9. Hermes Telegram/WhatsApp ainda TBD  
 
 ## Agente
 

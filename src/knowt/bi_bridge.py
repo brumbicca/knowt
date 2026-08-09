@@ -15,6 +15,8 @@ from knowt.answers import answer_chat
 from knowt.audit import append_answer_audit, audit_path_for
 from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import Period, today_br
+from knowt.sales_gates import can_publish_sales_summary, load_gates
+from knowt.sales_probe import load_latest_probe
 from knowt.sources import SourceRegistry
 from knowt.tasks_store import (
     add_task,
@@ -299,20 +301,66 @@ def create_bi_bridge_blueprint(
     @bp.get("/insights/plano")
     def insights_plano():
         period = _period_from_args()
+        _, missing = can_publish_sales_summary(data_dir)
+        probe = load_latest_probe(data_dir)
+        probe_detalhe = "Ainda sem probe — corre scripts/run_sales_probe.py"
+        if probe:
+            p1 = probe.get("page1_sample") or {}
+            oc = probe.get("orders_count") or {}
+            probe_detalhe = (
+                f"Último probe: {oc.get('total_orders')} ped. no período; "
+                f"soma valor pág.1={p1.get('page_valor_sum')} "
+                f"({p1.get('page_valor_parsed')} c/ valor). "
+                "Não extrapolar; sales.summary continua unavailable."
+            )
         return jsonify(
             {
                 "periodo": _periodo_payload(period),
                 "acoes": [
                     {
                         "titulo": "Validar sales.summary / margem",
-                        "detalhe": "Só publicar após pacote de negócio (zero verdade silenciosa).",
+                        "detalhe": (
+                            "Gates em falta: "
+                            + (", ".join(missing) if missing else "nenhum — ainda assim só publish manual")
+                            + ". Ver docs/SALES_SUMMARY_PACOTE.md"
+                        ),
                         "prioridade": 1,
-                    }
+                    },
+                    {
+                        "titulo": "Evidência do probe Tiny",
+                        "detalhe": probe_detalhe,
+                        "prioridade": 2,
+                    },
                 ],
-                "total": 1,
+                "total": 2,
                 "confianca": {"nivel": "media", "motivo": "piloto Tiny em expansão"},
                 "texto": "Plano knowt: expandir capabilities com validação.",
                 "fonte": "tinyerp",
+                "gates": load_gates(data_dir),
+                "probe": probe,
+            }
+        )
+
+    @bp.get("/sales/probe/latest")
+    def sales_probe_latest():
+        probe = load_latest_probe(data_dir)
+        ok_pub, missing = can_publish_sales_summary(data_dir)
+        if not probe:
+            return jsonify(
+                {
+                    "ok": True,
+                    "probe": None,
+                    "can_publish_sales_summary": ok_pub,
+                    "missing_gates": missing,
+                    "note": "Sem evidence/sales_probe_latest.json",
+                }
+            )
+        return jsonify(
+            {
+                "ok": True,
+                "probe": probe,
+                "can_publish_sales_summary": ok_pub,
+                "missing_gates": missing,
             }
         )
 
