@@ -85,6 +85,32 @@ def run_discovery_stub(registry: SourceRegistry, source_id: str) -> DiscoveryRep
         else:
             evidence.append("tiny_pedido_obter:skipped_no_sample_id")
 
+        # Evidência UI (Playwright) se já corrida — não bloqueia nem publica.
+        from knowt.config import Settings
+        from knowt.discovery_ui import has_storage_state, load_latest_product_cost_probe
+
+        data_dir = Settings.from_env().data_dir
+        if has_storage_state(data_dir, source_id):
+            evidence.append("ui_storage_state:present")
+        else:
+            evidence.append("ui_storage_state:missing")
+        ui = load_latest_product_cost_probe(data_dir)
+        if ui:
+            evidence.append(
+                "ui_product_cost:ok=%s:error=%s"
+                % (ui.get("ok"), ui.get("error") or "none")
+            )
+            for field in ui.get("fields") or []:
+                if field.get("found"):
+                    evidence.append(
+                        "ui_cost_field:%s=%s"
+                        % (field.get("api_key"), field.get("raw_value"))
+                    )
+            hypotheses.append(
+                "UI aba Custos observada (Playwright) — cost_field do gate "
+                "continua decisão humana"
+            )
+
         return DiscoveryReport(
             source_id=source_id,
             status="complete",

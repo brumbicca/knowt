@@ -17,6 +17,7 @@ from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import Period, today_br
 from knowt.sales_gates import can_publish_sales_summary, load_gates
 from knowt.sales_probe import load_latest_probe
+from knowt.discovery_ui import load_latest_product_cost_probe
 from knowt.sources import SourceRegistry
 from knowt.tasks_store import (
     add_task,
@@ -361,6 +362,21 @@ def create_bi_bridge_blueprint(
                 "probe": probe,
                 "can_publish_sales_summary": ok_pub,
                 "missing_gates": missing,
+            }
+        )
+
+    @bp.get("/discovery/ui/product-cost/latest")
+    def discovery_ui_product_cost_latest():
+        probe = load_latest_product_cost_probe(data_dir)
+        return jsonify(
+            {
+                "ok": True,
+                "probe": probe,
+                "note": (
+                    None
+                    if probe
+                    else "Sem evidence/ui_tiny_product_cost_latest.json — corre probe-cost"
+                ),
             }
         )
 

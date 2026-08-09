@@ -8,10 +8,10 @@
 `sales.summary` permanece `unavailable`.
 Bridge: `GET /api/bridge/sales/probe/latest` e `/insights/plano` (Bearer).
 
-**Gates parciais (2026-08-09):** VPS `sales_summary_gates.json` —
+**Gates (2026-08-09):** VPS `sales_summary_gates.json` —
 `cost_field=defer`, `missing_cost_policy=block_metric`, `cmv_composition_ok=product_only`,
-`matches_official_report=unknown`. **`approved_to_publish=false`** (falta isso + `approver`
-após reconciliação com relatório oficial).
+`matches_official_report=yes` (amostra 3/3 na UI + contagem ~3465/3467).
+**`approved_to_publish=false`** (falta dono + `cost_field` ≠ defer antes de publish).
 
 ## Como exportar no Tiny (mesmo período do probe)
 
@@ -62,6 +62,23 @@ notas: …
 | Ainda sem export / dúvida de filtro | `unknown` (como agora) |
 
 **Não** marcar `approved_to_publish=true` só porque a contagem bate — falta ainda `cost_field` ≠ `defer` (ou decisão explícita) + dono.
+
+## Discovery UI Playwright (aba Custos)
+
+Em vez de guiar cliques à mão, o knowt grava evidência sozinho:
+
+```text
+pip install "playwright>=1.40,<2"
+python -m playwright install chromium
+# 1ª vez (humano no browser):
+python scripts/run_discovery_ui.py login
+# depois (headless):
+python scripts/run_discovery_ui.py probe-cost --product-id 747196165
+```
+
+- Sessão: `$KNOWT_DATA_DIR/discovery/tinyerp/storage_state.json`
+- Evidence: `evidence/ui_tiny_product_cost_*.json`
+- **Não** preenche `cost_field` no gate — só labels/valores observados.
 
 ## O que o knowt faz agora
 
