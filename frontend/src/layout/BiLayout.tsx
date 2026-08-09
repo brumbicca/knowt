@@ -46,7 +46,7 @@ export function BiLayout() {
     data,
   } = useBiData()
   const { isFiestaActive, activeSource } = useBiSource()
-  const sourceLabel = activeSource?.name || 'Fiesta'
+  const sourceLabel = activeSource?.name || 'Tiny ERP'
 
   useEffect(() => {
     const openAssistant = (event: Event) => {
@@ -83,9 +83,9 @@ export function BiLayout() {
 
   const statusLine = [
     `Fonte · ${sourceLabel}`,
-    isFiestaActive ? 'Marketplaces · knowt' : 'Consulta externa · sem mistura',
+    'Tiny ao vivo · knowt',
     [
-      isFiestaActive ? 'Mesma verdade que a knowt' : `Origem ${sourceLabel}`,
+      'Contagem live',
       data?.rangeLabel,
       marketplace ? canalLabel : null,
       data?.prevVendasFmt

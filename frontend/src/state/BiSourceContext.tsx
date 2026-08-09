@@ -95,8 +95,8 @@ export function BiSourceProvider({ children }: { children: ReactNode }) {
           setSources([
             {
               id: 'tinyerp',
-              name: 'Fiesta',
-              db_name: 'ecommerce_financial',
+              name: 'Tiny ERP',
+              db_name: 'bi_tinyerp',
               builtin: true,
               status: 'active',
             },

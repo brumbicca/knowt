@@ -316,6 +316,69 @@ def create_bi_bridge_blueprint(
             }
         )
 
+    @bp.get("/fonte/status")
+    def fonte_status():
+        """Proveniência honest para o strip da UI (sem espelho Mongo)."""
+        registry.load()
+        sid = (request.args.get("source_id") or "tinyerp").strip() or "tinyerp"
+        src = registry.get(sid)
+        live_caps = [
+            c.id
+            for c in (src.capabilities if src else [])
+            if getattr(c, "status", None) == "live"
+        ]
+        period = _period_from_args()
+        d0, d1 = period.tiny_bounds()
+        pedidos = 0
+        count_ok = False
+        try:
+            counted = count_orders_in_period(_token(), data_inicial=d0, data_final=d1)
+            count_ok = counted.ok
+            pedidos = int(counted.total_orders or 0) if counted.ok else 0
+        except Exception:
+            pedidos = int((registry.get("tinyerp") and 0) or 0)
+        name = "Tiny ERP"
+        if sid != "tinyerp" and src is not None:
+            name = str(getattr(src, "system", None) or sid)
+        return jsonify(
+            {
+                "ok": True,
+                "source_id": sid,
+                "health": "ok" if count_ok else "warning",
+                "shadow": False,
+                "source": {
+                    "id": sid,
+                    "name": name,
+                    "db_name": "bi_tinyerp" if sid == "tinyerp" else sid,
+                    "builtin": True,
+                    "role": "erp",
+                    "status": "active",
+                    "is_mirror": False,
+                },
+                "freshness": {
+                    "field": "tiny_api_live",
+                    "at": None,
+                    "age_minutes": 0 if count_ok else None,
+                    "pedidos_count": pedidos,
+                    "ok": count_ok,
+                    "sla_minutes": 0,
+                    "state": "fresh" if count_ok else "unknown",
+                },
+                "coverage": {
+                    "pedidos_count": pedidos,
+                    "quality_suggestion": "live_api",
+                    "recon_ok": None,
+                    "capabilities": live_caps,
+                    "capabilities_count": len(live_caps),
+                },
+                "drift": {"last": None},
+                "provenance": {
+                    "label_pt": "Tiny ERP · API ao vivo",
+                    "contract_hint": "sem espelho Mongo · zero verdade silenciosa",
+                },
+            }
+        )
+
     @bp.get("/sync/status")
     def sync_status():
         return jsonify(
