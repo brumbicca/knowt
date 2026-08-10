@@ -129,11 +129,11 @@ Prioridade alta — já existem pedaços úteis no repo Fiesta:
 | T4 | Contratos versionados (`orders.v1` published, `sales.v1` draft) | **OK** | Hash + registry em `data/contracts` |
 | T5 | Kill switch por fonte + chat respeita `SOURCE_SUSPENDED` | **OK** | Manual; nunca auto no drift |
 | T6 | Drift (schema/contrato) com alerta `suggest_kill_switch` | **OK** | API; cron+alerta em T8 |
-| T7 | Discovery/dossiê consultável e alinhado ao que o chat diz | **parcial** | Dossiê existe; reforçar smoke guião vs API |
+| T7 | Discovery/dossiê consultável e alinhado ao que o chat diz | **OK** | smoke guião · `GUIAO_DEMO_TINY.md` |
 | T8 | Drift em **cron** VPS + alerta (Telegram ou log watchdog) | **OK** | timer 2 h · `run_drift_cron.py` |
-| T9 | Recon amostra/oficial alinhada às respostas do chat (pedidos) | **parcial** | Há aligned_sample sales; fechar smoke demo pedidos |
+| T9 | Recon amostra/oficial alinhada às respostas do chat (pedidos) | **OK** | smoke: chat == `/vendas/periodo?periodo=semana` |
 | T10 | `sales.summary` / margem **ou** decisão explícita «piloto sem receita até CMV» | **bloqueado negócio** | Humano: `cost_field` + `approved_to_publish` |
-| T11 | Guião demo estável (web + Telegram) com números batendo | **pendente** | Checklist de perguntas fixas + evidência |
+| T11 | Guião demo estável (web + Telegram) com números batendo | **OK** | evidência `guiao_demo_latest.json` |
 | T12 | Commit/push do estado actual no GitHub knowt | **OK** | fatia drift/kill + cron |
 
 **Green do piloto** = T1–T6 OK + T8 + T11 + (T10 resolvido **ou** decisão escrita «sem receita no piloto»).  
@@ -219,7 +219,7 @@ Preparar o sucessor **antes** do primeiro deploy na VPS nova, não depois de ter
 Ordem saudável (actualizado 2026-08-10):
 
 1. ~~Congelar frase de produto~~ · ~~mapa de herança~~ · ~~repo + VPS + Tiny~~  
-2. **Agora — só Tiny até green** (§3.5): ~~T8 cron~~ · T11 guião demo · T10 CMV ou decisão «sem receita» · fechar T7/T9.  
+2. **Agora — só Tiny até green** (§3.5): ~~T8~~ · ~~T11/T7/T9~~ · **T10** CMV ou decisão «sem receita».  
 3. **Depois do green:** 2ª fonte mínima (prova reutilização) · opcional WhatsApp/Google com credenciais.  
 4. **Mais tarde:** codegen conector (§8.12), multi-tenant SaaS, BI rico.
 

@@ -12,20 +12,19 @@ Não abrir 2ª fonte, SaaS multi-tenant nem codegen de conector antes do green.
 | # | Critério | Estado |
 |---|---|---|
 | T1–T6 | orders live, enforcement, Hermes, contratos, kill, drift API | **OK** |
-| T7 | Discovery/dossiê alinhado ao chat | parcial |
+| T7 | Discovery/dossiê alinhado ao chat | **OK** |
 | T8 | Cron drift + alerta | **OK** |
-| T9 | Recon pedidos vs chat (smoke) | parcial |
+| T9 | Recon pedidos vs chat (smoke) | **OK** |
 | T10 | sales/margem ou decisão «sem receita» | bloqueado negócio |
-| T11 | Guião demo estável | pendente |
+| T11 | Guião demo estável | **OK** |
 | T12 | GitHub = código da VPS | **OK** |
 
 **Green** = T1–T6 + T8 + T11 + (T10 ou decisão escrita sem receita).
 
 ### Ordem até green
 
-1. ~~T12 — commit/push~~ · ~~T8 — cron drift~~  
-2. T11 (+ T7/T9) — guião demo + smokes  
-3. T10 — CMV humano ou decisão «piloto sem receita»
+1. ~~T12 · T8 · T11/T7/T9~~  
+2. **T10** — CMV humano ou decisão «piloto sem receita»
 
 ## O que é isto
 
@@ -99,8 +98,10 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 
 1. ~~Infra + MVP + orders live + DNS + chat/Telegram/Hermes~~  
 2. ~~Contratos + kill + drift API~~  
-3. **Agora (só Tiny / green):** ~~T12~~ · ~~T8~~ · **T11/T7/T9** · T10  
+3. **Agora (só Tiny / green):** ~~T12~~ · ~~T8~~ · ~~T11/T7/T9~~ · **T10**  
 4. **Depois do green:** 2ª fonte · WhatsApp · Google com credenciais  
+
+Guião demo: `docs/GUIAO_DEMO_TINY.md` · smoke `scripts/smoke_guiao_demo_tiny.py`  
 
 Telegram: `docs/TELEGRAM.md` · Hermes: `docs/HERMES.md` · Google: `docs/GOOGLE.md` · Drift: `docs/DRIFT_KILL_CONTRATOS.md`
 

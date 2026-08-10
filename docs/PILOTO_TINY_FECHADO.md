@@ -21,11 +21,11 @@ Não é “implementar o PDF inteiro”; é provar no Tiny: descoberta → evid�
 | T4 | Contratos (`orders.v1` published, `sales.v1` draft) | **OK** | `docs/DRIFT_KILL_CONTRATOS.md` |
 | T5 | Kill switch + `SOURCE_SUSPENDED` no chat | **OK** | Manual; nunca auto no drift |
 | T6 | Drift schema/contrato + `suggest_kill_switch` | **OK** | API; falta cron |
-| T7 | Discovery/dossiê alinhado ao chat | **parcial** | Smoke guião vs API |
+| T7 | Discovery/dossiê alinhado ao chat | **OK** | smoke guião passo discovery |
 | T8 | Drift **cron** VPS + alerta | **OK** | timer 2 h · `run_drift_cron.py` · alerta se suggest (+ `KNOWT_DRIFT_ALERT_CHAT_IDS`) |
-| T9 | Recon amostra pedidos vs respostas chat | **parcial** | Smoke demo |
+| T9 | Recon amostra pedidos vs respostas chat | **OK** | smoke: chat == `/vendas/periodo?periodo=semana` |
 | T10 | `sales.summary`/margem **ou** decisão «piloto sem receita até CMV» | **bloqueado negócio** | Humano: cost_field + approved_to_publish |
-| T11 | Guião demo estável (web + Telegram) | **pendente** | Perguntas fixas + evidência |
+| T11 | Guião demo estável (web + Telegram) | **OK** | `docs/GUIAO_DEMO_TINY.md` · evidência `guiao_demo_latest.json` |
 | T12 | GitHub knowt com código = VPS | **OK** | push fatia drift/kill + cron |
 
 ## Green
@@ -38,8 +38,8 @@ T7/T9 fecham com smoke, não com refactor.
 
 1. ~~T12 — commit/push~~  
 2. ~~T8 — cron drift + alerta~~  
-3. T11 (+ T7/T9) — guião demo e smoke  
-4. T10 — esperar dono CMV **ou** decidir explicitamente piloto sem receita  
+3. ~~T11 (+ T7/T9) — guião demo e smoke~~  
+4. **T10** — esperar dono CMV **ou** decidir explicitamente piloto sem receita  
 
 ## Depois do green
 
