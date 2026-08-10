@@ -49,11 +49,28 @@ def run_sales_probe(
             {
                 "order_id": oid,
                 "ok": det.ok,
+                "numero": getattr(det, "numero", None),
                 "valor_total": det.valor_total,
                 "situacao": det.situacao,
                 "reason_code": det.reason_code,
             }
         )
+
+    order_numeros: List[str] = []
+    for prev in page.order_previews if page.ok else []:
+        if isinstance(prev, dict) and prev.get("numero"):
+            order_numeros.append(str(prev["numero"]))
+    for row in detail_rows:
+        if row.get("numero"):
+            order_numeros.append(str(row["numero"]))
+    # dedupe preservando ordem
+    seen_n: set[str] = set()
+    order_numeros_u: List[str] = []
+    for n in order_numeros:
+        if n in seen_n:
+            continue
+        seen_n.add(n)
+        order_numeros_u.append(n)
 
     gates = load_gates(data_dir)
     ok_publish, missing = can_publish_sales_summary(data_dir)
@@ -83,6 +100,8 @@ def run_sales_probe(
             "page_valor_sum": page.page_valor_sum if page.ok else None,
             "page_valor_parsed": page.page_valor_parsed if page.ok else 0,
             "order_ids_sample": list(page.order_ids[:10]) if page.ok else [],
+            "order_numeros_sample": order_numeros_u[:25],
+            "order_previews": list(page.order_previews[:8]) if page.ok else [],
             "reason_code": page.reason_code,
             "warning": (
                 "Soma de `valor` só da 1ª página — não extrapolar para o período inteiro."

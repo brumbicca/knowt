@@ -1,4 +1,4 @@
-"""Tarefas locais knowt — JSON em KNOWT_DATA_DIR (sem Google Tasks no MVP)."""
+"""Tarefas knowt — JSON local + Google Tasks quando OAuth ligado."""
 from __future__ import annotations
 
 import json
@@ -54,6 +54,42 @@ def list_tasks(data_dir: Path, status: str | None = "open") -> List[dict]:
     return tasks
 
 
+def complete_task(data_dir: Path, task_id: str) -> dict:
+    tid = (task_id or "").strip()
+    if not tid:
+        raise ValueError("id_required")
+    if tid.startswith("gtask:"):
+        from knowt.google_tasks import complete_google_task
+
+        return complete_google_task(tid)
+    data = _ensure_store(data_dir)
+    tasks = list(data.get("tasks") or [])
+    for t in tasks:
+        if str(t.get("id")) == tid:
+            t["status"] = "done"
+            t["updated_at"] = _now_iso()
+            _save(data_dir, {**data, "tasks": tasks})
+            return t
+    raise ValueError("not_found")
+
+
+def google_status() -> Dict[str, Any]:
+    from knowt.google_tasks import status as gstatus
+
+    return gstatus()
+
+
+def list_tasks_merged(data_dir: Path, status: str | None = "open") -> List[dict]:
+    local = list_tasks(data_dir, status=status)
+    try:
+        from knowt.google_tasks import list_google_tasks
+
+        gtasks = list_google_tasks(status)
+    except Exception:
+        gtasks = []
+    return list(gtasks) + list(local)
+
+
 def add_task(
     data_dir: Path,
     title: str,
@@ -69,6 +105,24 @@ def add_task(
     pr = (priority or "medium").strip().lower()
     if pr not in ("low", "medium", "high"):
         pr = "medium"
+
+    try:
+        from knowt.google_tasks import create_google_task, is_tasks_connected
+
+        if is_tasks_connected():
+            gt = create_google_task(title, due=due, notes=notes)
+            # espelho local
+            data = _ensure_store(data_dir)
+            tasks = list(data.get("tasks") or [])
+            mirror = dict(gt)
+            mirror["priority"] = pr
+            tasks.insert(0, mirror)
+            data["tasks"] = tasks
+            _save(data_dir, data)
+            return mirror
+    except Exception:
+        pass
+
     now = _now_iso()
     task = {
         "id": str(uuid.uuid4()),
@@ -87,28 +141,3 @@ def add_task(
     data["tasks"] = tasks
     _save(data_dir, data)
     return task
-
-
-def complete_task(data_dir: Path, task_id: str) -> dict:
-    tid = (task_id or "").strip()
-    if not tid:
-        raise ValueError("id_required")
-    data = _ensure_store(data_dir)
-    tasks = list(data.get("tasks") or [])
-    for t in tasks:
-        if str(t.get("id")) == tid:
-            t["status"] = "done"
-            t["updated_at"] = _now_iso()
-            _save(data_dir, {**data, "tasks": tasks})
-            return t
-    raise ValueError("not_found")
-
-
-def google_status() -> Dict[str, Any]:
-    return {
-        "google_tasks_connected": False,
-        "credentials_configured": False,
-        "auth_available": False,
-        "mode": "knowt_local",
-        "message": "Tarefas locais knowt activas. Google Tasks ainda não ligado neste piloto.",
-    }

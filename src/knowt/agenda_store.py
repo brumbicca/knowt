@@ -1,4 +1,4 @@
-"""Agenda local knowt — JSON em KNOWT_DATA_DIR (sem Google no MVP)."""
+"""Agenda knowt — JSON local + Google Calendar quando OAuth ligado."""
 from __future__ import annotations
 
 import json
@@ -63,6 +63,25 @@ def list_events(data_dir: Path, d0: date, d1: date) -> List[dict]:
     return out
 
 
+def google_status() -> Dict[str, Any]:
+    from knowt.google_oauth import status as gstatus
+
+    return gstatus()
+
+
+def list_events_merged(data_dir: Path, d0: date, d1: date) -> List[dict]:
+    local = list_events(data_dir, d0, d1)
+    try:
+        from knowt.google_oauth import list_google_events
+
+        gcal = list_google_events(d0, d1)
+    except Exception:
+        gcal = []
+    merged = list(local) + list(gcal)
+    merged.sort(key=lambda e: str(e.get("start") or ""))
+    return merged
+
+
 def add_event(
     data_dir: Path,
     title: str,
@@ -84,6 +103,36 @@ def add_event(
             end = end.replace(tzinfo=TZ)
     else:
         end = start + timedelta(hours=1)
+
+    # Preferir Google quando ligado; sempre guardar espelho local
+    try:
+        from knowt.google_oauth import create_google_event, is_connected
+
+        if is_connected():
+            gev = create_google_event(
+                title,
+                start.astimezone(TZ).isoformat(),
+                end.astimezone(TZ).isoformat(),
+            )
+            # espelho local com referência google
+            ev = {
+                "id": gev.get("id") or str(uuid.uuid4()),
+                "title": gev.get("title") or title,
+                "start": gev.get("start") or start.astimezone(TZ).isoformat(),
+                "end": gev.get("end") or end.astimezone(TZ).isoformat(),
+                "kind": "google",
+                "source": "google_calendar",
+                "html_link": gev.get("html_link"),
+            }
+            data = _ensure_store(data_dir)
+            events = list(data.get("events") or [])
+            events.append(ev)
+            data["events"] = events
+            _save(data_dir, data)
+            return ev
+    except Exception:
+        pass
+
     ev = {
         "id": str(uuid.uuid4()),
         "title": title,
@@ -98,13 +147,3 @@ def add_event(
     data["events"] = events
     _save(data_dir, data)
     return ev
-
-
-def google_status() -> Dict[str, Any]:
-    return {
-        "google_connected": False,
-        "credentials_configured": False,
-        "auth_available": False,
-        "mode": "knowt_local",
-        "message": "Agenda local knowt activa. Google Calendar ainda não ligado neste piloto.",
-    }

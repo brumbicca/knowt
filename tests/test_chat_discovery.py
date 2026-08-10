@@ -29,3 +29,15 @@ def test_answer_discovery_dossier(tmp_path, monkeypatch):
     assert out["enforcement"]["reason_code"] == "DISCOVERY_OBSERVATION"
     assert "Dossiê Discovery" in (out["answer"] or "")
     assert "cost_field" in (out["answer"] or "")
+
+    casual = answer_chat(
+        reg,
+        message="O que já conhecemos do Tiny?",
+        source_id="tinyerp",
+        data_dir=tmp_path,
+        tone="casual",
+    )
+    assert casual["enforcement"]["capability_id"] == "discovery.dossier"
+    assert "mapeámos" in (casual["answer"] or "") or "mapeamos" in (casual["answer"] or "")
+    assert "orders.list" not in (casual["answer"] or "")
+    assert "`" not in (casual["answer"] or "")

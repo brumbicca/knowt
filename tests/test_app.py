@@ -15,6 +15,8 @@ def _settings(tmp_path: Path, *, api_token: str = "", chat_password: str = "") -
         api_token=api_token,
         chat_password=chat_password,
         secret_key="test-secret",
+        mongo_uri="mongodb://127.0.0.1:27017",
+        mongo_db="knowt_test",
     )
 
 

@@ -18,6 +18,8 @@ def _settings(tmp_path: Path) -> Settings:
         api_token="tok",
         chat_password="",
         secret_key="test-secret",
+        mongo_uri="mongodb://127.0.0.1:27017",
+        mongo_db="knowt_test",
     )
 
 
@@ -70,3 +72,18 @@ def test_bridge_tarefas_and_agenda(tmp_path: Path, monkeypatch):
     prox = client.get("/api/bridge/agenda/periodo?periodo=proximos", headers=hdr)
     assert prox.status_code == 200
     assert prox.get_json()["count"] >= 1
+
+    auth = client.get("/api/bridge/agenda/google/auth-url", headers=hdr)
+    assert auth.status_code == 400
+    assert auth.get_json()["error"] == "google_credentials_missing"
+
+    # callback é público (sem Bearer) — falha de state, não 401
+    cb = client.get("/api/bridge/agenda/google/callback?code=x&state=y")
+    assert cb.status_code == 400
+    assert b"Falha OAuth" in cb.data
+
+    health = client.get("/api/bridge/health")
+    assert health.status_code == 200
+    h = health.get_json()
+    assert h["google_connected"] is False
+    assert h["google_credentials_configured"] is False

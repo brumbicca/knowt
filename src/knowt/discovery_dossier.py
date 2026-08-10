@@ -19,6 +19,16 @@ from knowt.sales_gates import load_gates
 from knowt.sales_probe import load_latest_probe
 
 
+def _load_latest_margin_recon(data_dir: Path) -> Optional[Dict[str, Any]]:
+    path = evidence_dir(data_dir) / "ui_margin_recon_latest.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def _page_summary(pages: List[Dict[str, Any]], *, limit: int = 40) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for p in pages[:limit]:
@@ -42,16 +52,22 @@ def build_discovery_dossier(data_dir: Path) -> Dict[str, Any]:
     margins = load_latest_margin_reports(data_dir) or {}
     costs = load_latest_product_cost_probe(data_dir) or {}
     sales = load_latest_probe(data_dir) or {}
+    recon = _load_latest_margin_recon(data_dir) or {}
     gates = load_gates(data_dir)
 
     margin_reports = []
     for r in margins.get("reports") or []:
+        pa = r.get("period_attempt") or {}
         margin_reports.append(
             {
                 "key": r.get("key"),
                 "label": r.get("label"),
                 "url": r.get("url"),
                 "ok": r.get("ok"),
+                "generated_ok": r.get("generated_ok"),
+                "generated_rows": r.get("generated_rows") or pa.get("row_count"),
+                "period_shortcut": pa.get("shortcut"),
+                "table_headers": (r.get("table_headers") or [])[:20],
                 "columns_selected": (r.get("columns") or [])[:20],
                 "cost_fields_in_catalog": (r.get("available_columns_sample") or [])[:10],
                 "hints": r.get("hints"),
@@ -81,6 +97,8 @@ def build_discovery_dossier(data_dir: Path) -> Dict[str, Any]:
             "expand_pages_ok": expand.get("pages_ok"),
             "expand_pages_total": expand.get("pages_total"),
             "margin_reports_ok": margins.get("reports_ok"),
+            "margin_generated_ok": margins.get("generated_ok"),
+            "margin_recon_verdict": ((recon.get("comparison") or {}).get("verdict")),
             "product_cost_ok": costs.get("ok"),
             "sales_probe_orders": ((sales.get("orders_count") or {}).get("total_orders")),
             "cost_field_gate": (gates.get("answers") or {}).get("cost_field"),
@@ -114,6 +132,29 @@ def build_discovery_dossier(data_dir: Path) -> Dict[str, Any]:
             "period": sales.get("period"),
             "orders_total": ((sales.get("orders_count") or {}).get("total_orders")),
             "page1_valor_sum": ((sales.get("page1_sample") or {}).get("page_valor_sum")),
+            "order_numeros_sample": (
+                (sales.get("page1_sample") or {}).get("order_numeros_sample") or []
+            )[:15],
+        },
+        "margin_recon": {
+            "at": recon.get("at"),
+            "verdict": ((recon.get("comparison") or {}).get("verdict")),
+            "situacoes_all": ((recon.get("report") or {}).get("situacoes_all")),
+            "probe_orders": ((recon.get("comparison") or {}).get("orders_total_probe")),
+            "report_page_rows": ((recon.get("comparison") or {}).get("report_page_rows")),
+            "report_unique_orders": (
+                (recon.get("comparison") or {}).get("orders_unique_on_report_page1")
+            ),
+            "report_page_valor_sum": (
+                (recon.get("comparison") or {}).get("report_page_valor_sum")
+            ),
+            "probe_page1_valor_sum": (
+                (recon.get("comparison") or {}).get("probe_page1_valor_sum")
+            ),
+            "sample_numero_overlap": (
+                (recon.get("comparison") or {}).get("sample_numero_overlap") or []
+            )[:15],
+            "notes": ((recon.get("comparison") or {}).get("verdict_notes") or [])[:6],
         },
         "gates": {
             "answers": gates.get("answers"),
@@ -163,9 +204,19 @@ def render_dossier_markdown(dossier: Dict[str, Any]) -> str:
         f"- Mapa base: **{s.get('system_map_pages')}** páginas",
         f"- Expand menus: **{s.get('expand_discovered')}** links · "
         f"**{s.get('expand_pages_ok')}/{s.get('expand_pages_total')}** visitadas OK",
-        f"- Relatórios oficiais de margem: **{s.get('margin_reports_ok')}** OK",
+        f"- Relatórios oficiais de margem: **{s.get('margin_reports_ok')}** OK"
+        + (
+            f" · tabela gerada: **{s.get('margin_generated_ok')}**/2"
+            if s.get("margin_generated_ok") is not None
+            else ""
+        ),
         f"- Amostra aba Custos: **{'ok' if s.get('product_cost_ok') else 'n/d'}**",
         f"- Probe vendas (7d): **{s.get('sales_probe_orders')}** pedidos",
+        (
+            f"- Recon relatório oficial ↔ probe: **{s.get('margin_recon_verdict') or 'n/d'}**"
+            if s.get("margin_recon_verdict") is not None
+            else "- Recon relatório oficial ↔ probe: **n/d**"
+        ),
         f"- Gate `cost_field`: **`{s.get('cost_field_gate')}`**",
         f"- `approved_to_publish`: **{s.get('approved_to_publish')}**",
         "",
@@ -182,6 +233,14 @@ def render_dossier_markdown(dossier: Dict[str, Any]) -> str:
     for r in ((dossier.get("margin_official_reports") or {}).get("reports") or []):
         lines.append(f"### {r.get('label')}")
         lines.append(f"- URL: `{r.get('url')}`")
+        if r.get("generated_ok"):
+            lines.append(
+                f"- Geração tabela: **ok** · linhas amostra: **{r.get('generated_rows')}**"
+                f" · atalho: `{r.get('period_shortcut')}`"
+            )
+        headers = r.get("table_headers") or []
+        if headers:
+            lines.append(f"- Cabeçalhos gerados: {', '.join(headers[:12])}")
         cols = r.get("columns_selected") or []
         if cols:
             lines.append(f"- Colunas seleccionadas (amostra): {', '.join(cols[:12])}")
@@ -189,8 +248,30 @@ def render_dossier_markdown(dossier: Dict[str, Any]) -> str:
         if costish:
             lines.append(f"- No catálogo «adicionar colunas»: **{', '.join(costish)}**")
         lines.append("")
+    lines += ["", "## Reconciliação relatório oficial ↔ probe", ""]
+    mr = dossier.get("margin_recon") or {}
+    if mr.get("verdict"):
+        lines.append(f"- Verdict: **{mr.get('verdict')}**")
+        lines.append(f"- Situações (selecionar todas): **{mr.get('situacoes_all')}**")
+        lines.append(
+            f"- Probe pedidos 7d: **{mr.get('probe_orders')}** · "
+            f"página relatório: **{mr.get('report_page_rows')}** linhas / "
+            f"**{mr.get('report_unique_orders')}** nº únicos"
+        )
+        lines.append(
+            f"- Valor 1ª página: relatório **{mr.get('report_page_valor_sum')}** · "
+            f"API **{mr.get('probe_page1_valor_sum')}**"
+        )
+        ov = mr.get("sample_numero_overlap") or []
+        if ov:
+            lines.append(f"- Overlap números (amostra): {', '.join(str(x) for x in ov[:12])}")
+        for n in mr.get("notes") or []:
+            lines.append(f"- {n}")
+    else:
+        lines.append("- (sem ui_margin_recon_latest.json)")
     pc = dossier.get("product_cost_sample") or {}
     lines += [
+        "",
         "## Amostra aba Custos (produto)",
         "",
         f"- Produto: {(pc.get('product') or {}).get('name')}",
@@ -224,21 +305,81 @@ def render_dossier_markdown(dossier: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_dossier_chat(dossier: Dict[str, Any]) -> str:
+def render_dossier_chat(dossier: Dict[str, Any], *, tone: str = "default") -> str:
     """Resumo curto para o assistente (sem dump enorme)."""
+    casual = (tone or "").strip().lower() in ("casual", "telegram", "human")
     s = dossier.get("summary") or {}
+    if casual:
+        lines = [
+            "Isto é o que já mapeámos do Tiny (observação — não é KPI live de vendas/margem):",
+            f"· {s.get('system_map_pages') or 0} páginas base no mapa",
+            f"· Menus: {s.get('expand_discovered') or 0} links · "
+            f"{s.get('expand_pages_ok') or 0}/{s.get('expand_pages_total') or 0} visitados",
+            f"· Relatórios oficiais de margem: {s.get('margin_reports_ok') or 0} abertos"
+            + (
+                f" ({s.get('margin_generated_ok')} gerados com tabela)"
+                if s.get("margin_generated_ok") is not None
+                else ""
+            ),
+            f"· Aba Custos (amostra): "
+            f"{'ok' if s.get('product_cost_ok') else 'ainda sem evidência'}",
+            f"· Pedidos nos últimos 7 dias (probe): "
+            f"{s.get('sales_probe_orders') if s.get('sales_probe_orders') is not None else 'n/d'}",
+        ]
+        if s.get("margin_recon_verdict"):
+            lines.append(
+                f"· Cruzamento relatório oficial ↔ API: {s.get('margin_recon_verdict')}"
+            )
+        if s.get("cost_field_gate") == "defer" or not s.get("approved_to_publish"):
+            lines.append(
+                "· Margem ainda não publicada (falta decisão de custo / aprovação)."
+            )
+        for r in ((dossier.get("margin_official_reports") or {}).get("reports") or []):
+            costish = r.get("cost_fields_in_catalog") or []
+            if costish:
+                lines.append(
+                    f"· No relatório «{r.get('label')}» existem colunas: "
+                    + ", ".join(costish)
+                )
+                break
+        pc = dossier.get("product_cost_sample") or {}
+        fields = pc.get("fields") or []
+        if fields:
+            bits = [
+                f"{f.get('ui_label')}={f.get('raw_value')}"
+                for f in fields
+                if f.get("raw_value") is not None
+            ]
+            if bits:
+                prod = ((pc.get("product") or {}).get("name") or "produto amostra")[:60]
+                lines.append(f"· Exemplo «{prod}»: " + " · ".join(bits))
+        lines.append(
+            "Exemplos: «pedidos esta semana», «resumo de pedidos», «o que podes fazer?»."
+        )
+        return "\n".join(lines)
+
     lines = [
         "Dossiê Discovery Tiny (observação Playwright — **não** é KPI de vendas/margem live):",
         f"- Mapa base: **{s.get('system_map_pages') or 0}** páginas",
         f"- Expand menus: **{s.get('expand_discovered') or 0}** links · "
         f"**{s.get('expand_pages_ok') or 0}/{s.get('expand_pages_total') or 0}** visitadas",
-        f"- Relatórios oficiais de margem abertos: **{s.get('margin_reports_ok') or 0}**",
+        f"- Relatórios oficiais de margem abertos: **{s.get('margin_reports_ok') or 0}**"
+        + (
+            f" · gerados: **{s.get('margin_generated_ok')}**"
+            if s.get("margin_generated_ok") is not None
+            else ""
+        ),
         f"- Amostra aba Custos: **{'ok' if s.get('product_cost_ok') else 'sem evidência'}**",
         f"- Probe vendas (7d): **{s.get('sales_probe_orders') if s.get('sales_probe_orders') is not None else 'n/d'}** pedidos",
+        (
+            f"- Recon oficial ↔ probe: **{s.get('margin_recon_verdict')}**"
+            if s.get("margin_recon_verdict")
+            else None
+        ),
         f"- Gate `cost_field`: **`{s.get('cost_field_gate') or 'n/d'}`** · "
         f"publish: **{bool(s.get('approved_to_publish'))}**",
     ]
-    # destaque custo oficial
+    lines = [x for x in lines if x]
     for r in ((dossier.get("margin_official_reports") or {}).get("reports") or []):
         costish = r.get("cost_fields_in_catalog") or []
         if costish:

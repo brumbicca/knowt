@@ -64,3 +64,10 @@ def parse_period(text: str) -> Optional[Period]:
         except ValueError:
             return None
     return None
+
+
+def period_esta_semana(hoje: Optional[date] = None) -> Period:
+    """Segunda → hoje (America/Sao_Paulo)."""
+    d = hoje or today_br()
+    start = d - timedelta(days=d.weekday())
+    return Period(start, d, "esta semana")

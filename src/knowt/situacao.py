@@ -44,6 +44,11 @@ _BREAKDOWN_PATTERNS = (
     r"\bbreakdown\b",
     r"\bresumo\b",
     r"\bquebra\b",
+    r"\bdetalhe\s+por\s+situa",
+    r"\bsitua[cç][oõ]es\b",
+    # follow-ups curtos pós «pedidos esta semana»
+    r"^\s*(?:ok|certo|sim)[,!.]?\s*(?:por\s+situa|situa)",
+    r"^\s*por\s+situa",
 )
 
 

@@ -10,6 +10,9 @@ from knowt.tiny_orders import TinyOrdersCount
 
 
 def test_answer_breakdown_esta_semana(tmp_path: Path, monkeypatch):
+    from knowt.order_breakdown import clear_breakdown_cache
+
+    clear_breakdown_cache()
     monkeypatch.setenv("KNOWT_SECRET_TINY_TOKEN", "tok")
     reg = SourceRegistry(tmp_path / "sources.json")
     seed_tiny_draft(reg)
@@ -59,6 +62,62 @@ def test_answer_breakdown_esta_semana(tmp_path: Path, monkeypatch):
     assert "aprovado" in out["answer"]
     assert "40" in out["answer"]
     assert out["data"]["breakdown"]["by_situacao"]
+
+
+def test_answer_breakdown_followup_ok_por_situacao(tmp_path: Path, monkeypatch):
+    """«Ok, por situação» sem período → semana + tabela HTML casual."""
+    from knowt.order_breakdown import clear_breakdown_cache
+
+    clear_breakdown_cache()
+    monkeypatch.setenv("KNOWT_SECRET_TINY_TOKEN", "tok")
+    reg = SourceRegistry(tmp_path / "sources.json")
+    seed_tiny_draft(reg)
+    publish_orders_list_live(reg)
+
+    total = TinyOrdersCount(
+        ok=True,
+        reason_code="OK",
+        data_inicial="03/08/2026",
+        data_final="08/08/2026",
+        total_orders=50,
+        pages_fetched=1,
+        total_pages=1,
+        method="single_page",
+    )
+
+    def fake_count(token, *, data_inicial, data_final, situacao=None, timeout=60.0):
+        if situacao is None:
+            return total
+        n = {"entregue": 30, "cancelado": 2}.get(situacao, 0)
+        return TinyOrdersCount(
+            ok=True,
+            reason_code="OK",
+            data_inicial=data_inicial,
+            data_final=data_final,
+            total_orders=n,
+            pages_fetched=1,
+            total_pages=1,
+            method="single_page",
+        )
+
+    with patch("knowt.answers.count_orders_in_period", side_effect=fake_count):
+        with patch("knowt.order_breakdown.count_orders_in_period", side_effect=fake_count):
+            with patch(
+                "knowt.period.today_br",
+                return_value=__import__("datetime").date(2026, 8, 8),
+            ):
+                out = answer_chat(
+                    reg,
+                    message="Ok, por situação",
+                    source_id="tinyerp",
+                    tone="casual",
+                )
+    assert out["enforcement"]["mode"] == "fact"
+    assert out["data"]["period"] == "esta semana"
+    assert "Situação" in out["answer"]
+    assert "entregue" in out["answer"]
+    assert "<pre>" in (out.get("answer_html") or "")
+    assert "752095868" not in out["answer"]
 
 
 def test_answer_detail_shows_ecommerce(tmp_path: Path, monkeypatch):

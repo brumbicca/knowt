@@ -11,8 +11,13 @@ Environment=KNOWT_ENV=production
 Environment=KNOWT_DATA_DIR=/root/knowt-data
 Environment=KNOWT_HOST=127.0.0.1
 Environment=KNOWT_PORT=8766
+Environment=HERMES_HOME=/root/.hermes
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/root/knowt/.env
 ExecStart=/root/knowt/.venv/bin/python -m knowt.app
+TimeoutStartSec=30
+# hermes chat pode demorar; o request HTTP aguarda no worker
+# (timeout controlado em KNOWT_HERMES_CHAT_TIMEOUT)
 Restart=on-failure
 RestartSec=3
 

@@ -115,11 +115,16 @@ python scripts/run_discovery_ui.py probe-cost --product-id 747196165
 
 ## Texto curto para o Time (adaptado knowt)
 
-> Estamos a preparar vendas/margem no **knowt** (chat + Insights), ligados à Tiny, sem inventar números.  
-> No cadastro Tiny, o CMV de produto que usam no dia a dia é **preço de custo** ou **preço de custo médio**?  
-> Produto sem custo: excluimos, zeramos, ou bloqueamos a métrica até o cadastro estar completo?  
-> Impostos/frete/taxas entram no CMV de vocês neste piloto, ou deixamos CMV só de produto?  
-> Quando tiveremos um relatório oficial do mesmo período para cruzar a amostra do probe?
+> Estamos a preparar vendas/margem no **knowt** (chat + Insights), ligados à Tiny, **sem inventar números**.
+>
+> No cadastro Tiny, o CMV de produto que usam no dia a dia é **preço de custo** ou **custo médio**?
+> (Exemplo SKU «Balão Redondo Liso 10" Azul»: preço de custo **R$ 0,81** vs custo médio **R$ 18,31** — a escolha muda a margem por completo.)
+>
+> Produto sem custo: **excluimos**, **zeramos**, ou **bloqueamos** a métrica até o cadastro estar completo?
+>
+> Impostos/frete/taxas entram no CMV neste piloto, ou deixamos CMV **só de produto**?
+>
+> Quando tiverem um relatório oficial do mesmo período (ideal: 03–09/08) para cruzar a amostra?
 
 ## Depois das respostas
 

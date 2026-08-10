@@ -5,10 +5,11 @@
 ## Resumo
 
 - Mapa base: **9** páginas
-- Expand menus: **41** links · **35/35** visitadas OK
-- Relatórios oficiais de margem: **2** OK
+- Expand menus: **41** links · **41/41** visitadas OK
+- Relatórios oficiais de margem: **2** OK · tabela gerada: **2**/2
 - Amostra aba Custos: **ok**
-- Probe vendas (7d): **3467** pedidos
+- Probe vendas (7d): **3503** pedidos
+- Recon relatório oficial ↔ probe: **aligned_sample**
 - Gate `cost_field`: **`defer`**
 - `approved_to_publish`: **False**
 
@@ -21,13 +22,31 @@
 
 ### Tiny - Avaliação de margem
 - URL: `https://erp.olist.com/relatorios_personalizados#/view/27`
+- Geração tabela: **ok** · linhas amostra: **100** · atalho: `ultimos_7_dias`
+- Cabeçalhos gerados: Natureza de operação, Número, Canal de venda, Identificador do pedido e-commerce, Total Produtos, Valor total da venda, Desconto, Comissão canal de venda, Frete pago pelo cliente, Frete pago pela empresa, UF, Valor ICMS
 - Colunas seleccionadas (amostra): Início, Cadastros, Suprimentos, Vendas, Finanças, Fixar menu, ferramentas, relatórios personalizados, Natureza de operação, Número, Canal de venda, Identificador do pedido e-commerce
 - No catálogo «adicionar colunas»: **Preço de custo atual, Custo médio atual**
 
 ### Margem de Contribuição
 - URL: `https://erp.olist.com/relatorios_personalizados#/view/17`
+- Geração tabela: **ok** · linhas amostra: **100** · atalho: `ultimos_7_dias`
+- Cabeçalhos gerados: Número, Data da venda, Quantidade de produtos, Valor de desconto, Valor total da venda
 - Colunas seleccionadas (amostra): Início, Cadastros, Suprimentos, Vendas, Finanças, Fixar menu, ferramentas, relatórios personalizados, Número, Data da venda, Quantidade de produtos, Valor de desconto
 - No catálogo «adicionar colunas»: **Preço de custo atual, Custo médio atual**
+
+
+## Reconciliação relatório oficial ↔ probe
+
+- Verdict: **aligned_sample**
+- Situações (selecionar todas): **True**
+- Probe pedidos 7d: **3503** · página relatório: **100** linhas / **54** nº únicos
+- Valor 1ª página: relatório **3737.42** · API **4905.63**
+- Overlap números (amostra): 380980, 380981
+- Relatório UI 1ª página ≈ pedidos mais recentes (Nº alto).
+- API page_bounds: 36 páginas · total 3503.
+- Situações selecionar todas no relatório: True.
+- overlap última página API ∩ relatório: 2 → ['380980', '380981']
+- valor 1ª pág relatório=3737.42 · API pág1=4905.63 · API última=104.68
 
 ## Amostra aba Custos (produto)
 
@@ -74,6 +93,11 @@
 - Separação — `https://erp.olist.com/separacao`
 - Expedição — `https://erp.olist.com/expedicao`
 - Devoluções de venda — `https://erp.olist.com/devolucoes_vendas`
+- Perguntas do e-commerce — `https://erp.olist.com/perguntas_ecommerce`
+- Pós-venda Mercado Livre — `https://erp.olist.com/ecommerce_pos_venda`
+- Transações de vendas — `https://erp.olist.com/demonstrativo_de_vendas#/`
+- Contas a Pagar — `https://erp.olist.com/contas_pagar`
+- Cobranças Bancárias — `https://erp.olist.com/cobrancas_registradas#remessas`
 
 ## Perguntas humanas em aberto
 

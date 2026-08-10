@@ -18,6 +18,7 @@ from knowt.publish import (
     publish_orders_list_live,
 )
 from knowt.sources import SourceRegistry, seed_tiny_draft
+from knowt.orgs import OrgRegistry, seed_default_org
 from knowt.tiny_order_detail import fetch_order_detail
 from knowt.tiny_orders import fetch_orders_page
 from knowt.vault import resolve_secret
@@ -42,6 +43,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     registry = SourceRegistry(settings.data_dir / "sources.json")
     seed_tiny_draft(registry, org_id=settings.org_id)
     ensure_tiny_capability_slots(registry, "tinyerp")
+    org_registry = OrgRegistry(settings.data_dir)
+    seed_default_org(org_registry, org_id=settings.org_id)
 
     app = Flask(
         "knowt",
@@ -50,11 +53,13 @@ def create_app(settings: Settings | None = None) -> Flask:
     app.secret_key = settings.secret_key
     app.config["KNOWT_SETTINGS"] = settings
     app.config["KNOWT_REGISTRY"] = registry
+    app.config["KNOWT_ORGS"] = org_registry
     app.register_blueprint(
         create_bi_bridge_blueprint(
             registry,
             data_dir=settings.data_dir,
             api_token=settings.api_token,
+            org_registry=org_registry,
         )
     )
 
@@ -299,8 +304,12 @@ def main() -> None:
     _load_dotenv_into_environ(Path.cwd() / ".env")
     settings = Settings.from_env()
     app = create_app(settings)
-    app.run(host=settings.host, port=settings.port, debug=settings.env != "production")
-
+    app.run(
+        host=settings.host,
+        port=settings.port,
+        debug=settings.env != "production",
+        threaded=True,
+    )
 
 if __name__ == "__main__":
     main()

@@ -5,14 +5,26 @@ vendas/margem não são inventadas.
 """
 from __future__ import annotations
 
+import json
+import os
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from flask import Blueprint, jsonify, request
 
-from knowt.agenda_store import add_event, google_status as agenda_google_status, list_events
+from knowt.agenda_store import (
+    add_event,
+    google_status as agenda_google_status,
+    list_events_merged,
+)
+from knowt.agent_catalog import agent_catalog_payload
 from knowt.answers import answer_chat
 from knowt.audit import append_answer_audit, audit_path_for
+from knowt.google_oauth import build_auth_url, exchange_code, status as google_oauth_status
+from knowt.hermes_chat import assistant_engine, hermes_available, run_hermes_chat
+from knowt.mongo import ping_mongo
+from knowt.orgs import OrgRegistry, assert_source_in_org, default_org_id, seed_default_org
 from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
 from knowt.period import Period, today_br
 from knowt.sales_gates import can_publish_sales_summary, load_gates
@@ -24,15 +36,23 @@ from knowt.discovery_ui import (
     load_latest_system_map_expand,
 )
 from knowt.sales_probe import load_latest_probe
+from knowt.situacao import wants_situacao_breakdown
 from knowt.sources import SourceRegistry
 from knowt.tasks_store import (
     add_task,
     complete_task,
     google_status as tasks_google_status,
-    list_tasks,
+    list_tasks_merged,
 )
 from knowt.tiny_orders import count_orders_in_period, fetch_orders_page
 from knowt.vault import resolve_secret
+from knowt.whatsapp import (
+    handle_webhook_messages,
+    parse_allowlist as wa_parse_allowlist,
+    verify_signature,
+    verify_webhook_challenge,
+    whatsapp_configured,
+)
 
 
 def _period_from_args() -> Period:
@@ -81,8 +101,11 @@ def create_bi_bridge_blueprint(
     *,
     data_dir,
     api_token: str,
+    org_registry: OrgRegistry | None = None,
 ) -> Blueprint:
     bp = Blueprint("bi_bridge", __name__, url_prefix="/api/bridge")
+    orgs = org_registry or OrgRegistry(Path(data_dir))
+    seed_default_org(orgs)
 
     def _auth_ok() -> bool:
         expected = (api_token or "").strip()
@@ -99,6 +122,14 @@ def create_bi_bridge_blueprint(
 
     @bp.before_request
     def _guard():
+        path = (request.path or "").rstrip("/")
+        # públicos: health + webhook Meta (challenge + eventos)
+        if path.endswith("/api/bridge/health"):
+            return None
+        if path.endswith("/api/bridge/whatsapp/webhook"):
+            return None
+        if path.endswith("/api/bridge/agenda/google/callback"):
+            return None
         if not _auth_ok():
             return (
                 jsonify({"ok": False, "error": "unauthorized", "message": "Token inválido"}),
@@ -106,10 +137,108 @@ def create_bi_bridge_blueprint(
             )
         return None
 
+    def _resolve_org_id() -> str:
+        ctx = request.get_json(silent=True) or {}
+        if isinstance(ctx, dict):
+            c = ctx.get("context") or {}
+            if isinstance(c, dict) and c.get("org_id"):
+                return str(c.get("org_id")).strip() or default_org_id()
+        q = (request.args.get("org_id") or "").strip()
+        return q or default_org_id()
+
+    @bp.get("/health")
+    def health():
+        tg = bool(resolve_secret("KNOWT_TELEGRAM_BOT_TOKEN", required=False))
+        wa = whatsapp_configured()
+        hermes_bin = hermes_available()
+        engine = assistant_engine()
+        mongo = ping_mongo()
+        orgs.load()
+        seed_default_org(orgs)
+        gstat = google_oauth_status()
+        return jsonify(
+            {
+                "ok": True,
+                "service": "knowt-bridge",
+                "chat": True,
+                "hermes_bin": hermes_bin,
+                "assistant_engine": engine,
+                "org_id": default_org_id(),
+                "orgs_count": len(orgs.list()),
+                "telegram_configured": tg,
+                "whatsapp_configured": wa,
+                "whatsapp_webhook": "/api/bridge/whatsapp/webhook",
+                "mongo_ok": bool(mongo.get("ok")),
+                "mongo": mongo,
+                "google_credentials_configured": bool(gstat.get("credentials_configured")),
+                "google_connected": bool(gstat.get("google_connected")),
+                "google": gstat,
+                "telegram_note": (
+                    "Bot fino → /assistant/chat (engine="
+                    + engine
+                    + "). Hermes gateway Telegram fica off para não duplicar o token — ver docs/HERMES.md"
+                    if tg
+                    else "Define KNOWT_TELEGRAM_BOT_TOKEN — ver docs/TELEGRAM.md"
+                ),
+                "whatsapp_note": (
+                    "Cloud API activo — ver docs/WHATSAPP.md"
+                    if wa
+                    else "Define KNOWT_WHATSAPP_TOKEN + PHONE_NUMBER_ID — ver docs/WHATSAPP.md"
+                ),
+                "google_note": (
+                    "Calendar+Tasks ligados — ver docs/GOOGLE.md"
+                    if gstat.get("google_connected")
+                    else (
+                        "Credenciais prontas — GET /agenda/google/auth-url — ver docs/GOOGLE.md"
+                        if gstat.get("credentials_configured")
+                        else "Agenda local. Para Google: KNOWT_GOOGLE_CLIENT_ID/SECRET — docs/GOOGLE.md"
+                    )
+                ),
+            }
+        )
+
+    @bp.get("/catalog")
+    def catalog():
+        return jsonify(agent_catalog_payload("http://127.0.0.1:8766/api/bridge"))
+
+    @bp.get("/organizacoes")
+    def organizacoes():
+        orgs.load()
+        seed_default_org(orgs)
+        rows = [o.to_dict() for o in orgs.list()]
+        return jsonify(
+            {
+                "ok": True,
+                "orgs": rows,
+                "total": len(rows),
+                "default_org_id": default_org_id(),
+            }
+        )
+
+    @bp.get("/organizacoes/<org_id>")
+    def organizacao_get(org_id: str):
+        orgs.load()
+        org = orgs.get(org_id)
+        if not org:
+            return jsonify({"ok": False, "error": "org_not_found"}), 404
+        registry.load()
+        fontes_org = [s.to_dict() for s in registry.list(org_id=org_id)]
+        return jsonify({"ok": True, "org": org.to_dict(), "fontes": fontes_org})
+
     @bp.get("/fontes")
     def fontes():
         registry.load()
+        oid = _resolve_org_id()
         src = registry.get("tinyerp")
+        if src and not assert_source_in_org(src.org_id, oid):
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "org_mismatch",
+                    "message": f"Fonte tinyerp não pertence à org `{oid}`.",
+                    "org_id": oid,
+                }
+            ), 403
         page_count = 0
         try:
             page = fetch_orders_page(_token(), page=1)
@@ -124,10 +253,11 @@ def create_bi_bridge_blueprint(
             "builtin": True,
             "status": "active" if src else "draft",
             "role": "erp",
+            "org_id": (src.org_id if src else oid),
             "logo_url": None,
             "pedidos_count": page_count or 1,
         }
-        return jsonify({"ok": True, "fontes": [fonte], "total": 1})
+        return jsonify({"ok": True, "fontes": [fonte], "total": 1, "org_id": oid})
 
     @bp.get("/vendas/periodo")
     def vendas_periodo():
@@ -522,7 +652,7 @@ def create_bi_bridge_blueprint(
     @bp.get("/agenda/periodo")
     def agenda_periodo():
         period = _period_from_args()
-        events = list_events(data_dir, period.start, period.end)
+        events = list_events_merged(data_dir, period.start, period.end)
         gstat = agenda_google_status()
         return jsonify(
             {
@@ -532,7 +662,9 @@ def create_bi_bridge_blueprint(
                 "eventos": events,
                 "count": len(events),
                 "google": gstat,
-                "source": "knowt_local",
+                "source": "google+knowt_local"
+                if gstat.get("google_connected")
+                else "knowt_local",
             }
         )
 
@@ -555,18 +687,55 @@ def create_bi_bridge_blueprint(
 
     @bp.get("/agenda/google/auth-url")
     def agenda_google_auth_url():
-        return jsonify(
-            {
-                "ok": False,
-                "error": "google_not_configured",
-                "message": "Google Calendar ainda não está ligado no piloto knowt.",
-            }
-        ), 400
+        try:
+            out = build_auth_url()
+            return jsonify({"ok": True, **out, "google": google_oauth_status()})
+        except ValueError as exc:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                        "message": "Google OAuth não configurado — ver docs/GOOGLE.md",
+                        "google": google_oauth_status(),
+                    }
+                ),
+                400,
+            )
+
+    @bp.get("/agenda/google/callback")
+    def agenda_google_callback():
+        code = (request.args.get("code") or "").strip()
+        state = (request.args.get("state") or "").strip()
+        err = (request.args.get("error") or "").strip()
+        if err:
+            return (
+                f"<html><body><h3>Google OAuth cancelado</h3><p>{err}</p></body></html>",
+                400,
+                {"Content-Type": "text/html; charset=utf-8"},
+            )
+        try:
+            exchange_code(code, state)
+        except ValueError as exc:
+            return (
+                f"<html><body><h3>Falha OAuth</h3><p>{exc}</p>"
+                "<p>Fecha esta janela e tenta outra vez.</p></body></html>",
+                400,
+                {"Content-Type": "text/html; charset=utf-8"},
+            )
+        return (
+            "<html><body><h3>knowt · Google ligado</h3>"
+            "<p>Calendar e Tasks autorizados. Podes fechar esta janela.</p>"
+            "</body></html>",
+            200,
+            {"Content-Type": "text/html; charset=utf-8"},
+        )
 
     @bp.get("/tarefas")
     def tarefas():
         status = (request.args.get("status") or "open").strip().lower() or "open"
-        tasks = list_tasks(data_dir, status=status)
+        tasks = list_tasks_merged(data_dir, status=status)
+        gstat = tasks_google_status()
         return jsonify(
             {
                 "ok": True,
@@ -574,8 +743,10 @@ def create_bi_bridge_blueprint(
                 "tarefas": tasks,
                 "count": len(tasks),
                 "status_filter": status,
-                "google": tasks_google_status(),
-                "source": "knowt_local",
+                "google": gstat,
+                "source": "google+knowt_local"
+                if gstat.get("google_tasks_connected")
+                else "knowt_local",
             }
         )
 
@@ -614,13 +785,85 @@ def create_bi_bridge_blueprint(
         ctx = payload.get("context") or {}
         if isinstance(ctx, dict) and ctx.get("source_id"):
             source_id = str(ctx.get("source_id")).strip() or "tinyerp"
+        org_id = default_org_id()
+        if isinstance(ctx, dict) and ctx.get("org_id"):
+            org_id = str(ctx.get("org_id")).strip() or default_org_id()
+        src = registry.get(source_id)
+        if src and not assert_source_in_org(src.org_id, org_id):
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "org_mismatch",
+                    "message": f"Fonte `{source_id}` não pertence à org `{org_id}`.",
+                    "org_id": org_id,
+                    "source_org_id": src.org_id,
+                }
+            ), 403
         if not message:
             return jsonify({"ok": False, "error": "empty", "message": "Mensagem vazia"})
+        channel = ""
+        if isinstance(ctx, dict):
+            channel = str(ctx.get("channel") or "").strip().lower()
+        tone = "casual" if channel in ("telegram", "whatsapp") else "default"
+        engine = assistant_engine()
+        force = str((ctx or {}).get("engine") or "").strip().lower()
+        if force in ("hermes", "deterministic"):
+            engine = force
+        # Tabelas factuais (ex. por situação) → sempre determinístico + HTML
+        if wants_situacao_breakdown(message) and force != "hermes":
+            engine = "deterministic"
+        if engine == "hermes":
+            h = run_hermes_chat(
+                message,
+                session_id=str(payload.get("session_id") or "") or None,
+            )
+            try:
+                append_answer_audit(
+                    audit_path_for(data_dir),
+                    message=message,
+                    source_id=source_id,
+                    result={"engine": "hermes", **h},
+                )
+            except OSError:
+                pass
+            if h.get("ok"):
+                return jsonify(
+                    {
+                        "ok": True,
+                        "reply": h.get("reply") or "",
+                        "session_id": h.get("session_id")
+                        or payload.get("session_id")
+                        or "knowt-web",
+                        "engine": "hermes",
+                    }
+                )
+            # fallback determinístico se Hermes falhar
+            result = answer_chat(
+                registry,
+                message=message,
+                source_id=source_id,
+                data_dir=data_dir,
+                tone=tone,
+            )
+            reply = result.get("answer") or result.get("enforcement", {}).get("message") or ""
+            payload_out: Dict[str, Any] = {
+                "ok": True,
+                "reply": reply,
+                "session_id": payload.get("session_id") or "knowt-web",
+                "enforcement": result.get("enforcement"),
+                "engine": "deterministic",
+                "hermes_fallback": h.get("error") or "hermes_failed",
+            }
+            if result.get("answer_html"):
+                payload_out["reply_html"] = result["answer_html"]
+            return jsonify(payload_out)
+
         result = answer_chat(
             registry,
             message=message,
             source_id=source_id,
             data_dir=data_dir,
+            tone=tone,
         )
         try:
             append_answer_audit(
@@ -632,14 +875,126 @@ def create_bi_bridge_blueprint(
         except OSError:
             pass
         reply = result.get("answer") or result.get("enforcement", {}).get("message") or ""
-        return jsonify(
-            {
-                "ok": True,
-                "reply": reply,
-                "session_id": payload.get("session_id") or "knowt-web",
-                "enforcement": result.get("enforcement"),
-            }
+        payload_out = {
+            "ok": True,
+            "reply": reply,
+            "session_id": payload.get("session_id") or "knowt-web",
+            "enforcement": result.get("enforcement"),
+            "engine": "deterministic",
+        }
+        if result.get("answer_html"):
+            payload_out["reply_html"] = result["answer_html"]
+        return jsonify(payload_out)
+
+    def _assistant_reply_text(
+        message: str,
+        *,
+        source_id: str,
+        channel: str,
+        session_id: str,
+    ) -> str:
+        """Resposta em texto (WhatsApp / uso interno) — sem HTTP aninhado."""
+        tone = "casual" if channel in ("telegram", "whatsapp") else "default"
+        engine = assistant_engine()
+        if engine == "hermes":
+            h = run_hermes_chat(message, session_id=None)
+            # session_id wa-* não é hermes — não passar
+            if h.get("ok") and h.get("reply"):
+                try:
+                    append_answer_audit(
+                        audit_path_for(data_dir),
+                        message=message,
+                        source_id=source_id,
+                        result={"engine": "hermes", "channel": channel, **h},
+                    )
+                except OSError:
+                    pass
+                return str(h["reply"])
+        result = answer_chat(
+            registry,
+            message=message,
+            source_id=source_id,
+            data_dir=data_dir,
+            tone=tone,
         )
+        try:
+            append_answer_audit(
+                audit_path_for(data_dir),
+                message=message,
+                source_id=source_id,
+                result={"channel": channel, **result},
+            )
+        except OSError:
+            pass
+        return str(
+            result.get("answer")
+            or result.get("enforcement", {}).get("message")
+            or "(sem resposta)"
+        )
+
+    @bp.get("/whatsapp/webhook")
+    def whatsapp_webhook_verify():
+        mode = (request.args.get("hub.mode") or "").strip()
+        token = (request.args.get("hub.verify_token") or "").strip()
+        challenge = (request.args.get("hub.challenge") or "").strip()
+        expected = (
+            resolve_secret("KNOWT_WHATSAPP_VERIFY_TOKEN", required=False) or ""
+        ).strip()
+        ch = verify_webhook_challenge(
+            mode=mode,
+            token=token,
+            challenge=challenge,
+            expected_verify_token=expected,
+        )
+        if ch is None:
+            return "forbidden", 403
+        return ch, 200, {"Content-Type": "text/plain"}
+
+    @bp.post("/whatsapp/webhook")
+    def whatsapp_webhook_events():
+        raw = request.get_data(cache=False, as_text=False) or b""
+        app_secret = (
+            resolve_secret("KNOWT_WHATSAPP_APP_SECRET", required=False) or ""
+        ).strip()
+        if not verify_signature(raw, request.headers.get("X-Hub-Signature-256"), app_secret):
+            return jsonify({"ok": False, "error": "bad_signature"}), 403
+        if not whatsapp_configured():
+            return jsonify({"ok": False, "error": "whatsapp_not_configured"}), 503
+        try:
+            payload = json.loads(raw.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return jsonify({"ok": False, "error": "invalid_json"}), 400
+        access = (resolve_secret("KNOWT_WHATSAPP_TOKEN", required=False) or "").strip()
+        phone_id = (
+            resolve_secret("KNOWT_WHATSAPP_PHONE_NUMBER_ID", required=False) or ""
+        ).strip()
+        allow = wa_parse_allowlist(
+            resolve_secret("KNOWT_WHATSAPP_ALLOWLIST", required=False)
+            or os.environ.get("KNOWT_WHATSAPP_ALLOWLIST")
+        )
+        source_id = (
+            (os.environ.get("KNOWT_WHATSAPP_SOURCE_ID") or "tinyerp").strip() or "tinyerp"
+        )
+
+        def reply_fn(wa_id: str, text: str) -> str:
+            registry.load()
+            return _assistant_reply_text(
+                text,
+                source_id=source_id,
+                channel="whatsapp",
+                session_id=f"wa-{wa_id}",
+            )
+
+        # Responder 200 rápido à Meta: processar no mesmo pedido (timeout nginx 180s).
+        # Em volume alto, mover para fila async.
+        n = handle_webhook_messages(
+            payload if isinstance(payload, dict) else {},
+            allowlist=allow,
+            access_token=access,
+            phone_number_id=phone_id,
+            reply_fn=reply_fn,
+        )
+        return jsonify({"ok": True, "replied": n})
 
     @bp.post("/assistant/transcribe")
     def transcribe():

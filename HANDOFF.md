@@ -1,6 +1,6 @@
 # HANDOFF — knowt (sucessor / continuidade)
 
-**Actualizado:** 2026-08-08  
+**Actualizado:** 2026-08-10  
 **Origem da conversa de produto:** workspace Fiesta `c:\Apps\fiestaup` · doc espelho `docs/VISAO_FABRICA_COMPREENSAO_SISTEMAS.md`
 
 ## O que é isto
@@ -15,8 +15,8 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Nome / domínio | knowt (domínio reservado) |
 | Narrativa vs Fiesta | Distinta |
 | Piloto | Tiny ERP / Olist |
-| Tenancy MVP | Single-tenant (arquitectura ciente de org_id depois) |
-| Repo | `c:\Apps\knowt` (git local; remoto TBD) |
+| Tenancy MVP | Single-tenant com **org registry** (`default`) · API `/organizacoes` · ver `docs/ORGS.md` |
+| Repo | `c:\Apps\knowt` · origin `https://github.com/brumbicca/knowt.git` · main alinhado ao remoto nos commits; há trabalho local por publicar |
 | VPS | Nova · `179.198.118.171` · SSH verificado 2026-08-08 |
 | Hermes | Instância **nova** (não o da VPS Fiesta) |
 
@@ -44,22 +44,22 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | VPS host | `root@179.198.118.171` (`srv1890207.hstgr.cloud`) |
 | SSH key | `%USERPROFILE%\.ssh\id_ed25519_knowt` (comentário `knowt-vps`) |
 | API / chat URL | https://knowt.com.br (TLS 2026-08-08) |
-| Mongo | instância própria na VPS knowt (_ainda não_) |
-| Hermes home | SPA Insights+Chat (cópia fiesta-bi) em https://knowt.com.br · assistente via `/api/bridge` |
+| Mongo | `127.0.0.1:27017` DB `knowt` · `KNOWT_MONGO_URI` · health `mongo_ok` · **sem** espelho Tiny obrigatório (ver `docs/BANCO.md`) |
+| Hermes home | SPA Insights+Chat em https://knowt.com.br · assistente `/api/bridge` · **Telegram bot fino** (`knowt-telegram`) · **Hermes SOUL/MCP** instalado (`knowt-gateway` → bridge; ver `docs/HERMES.md`) |
 | Frontend | `knowt/frontend` · temas Fiesta no arranque · fonte Tiny |
 | Firewall Hostinger | grupo `knowt` · Accept 22/80/443 + Drop Any |
 | Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
 | Tiny `orders.list` | **live** — contagem por período, situação, **resumo/breakdown** por situação |
 | Tiny `orders.detail` | **live** — situação, cliente, itens, ecommerce, valor Tiny (sem CMV) |
-| Tiny `sales.summary` | ainda `unavailable` — probe ok; gates parciais (falta `approved_to_publish` + `cost_field`≠defer) · `docs/SALES_SUMMARY_PACOTE.md` |
-| Discovery UI Playwright | dossiê consolidado `docs/TINY_DISCOVERY_DOSSIER.md` · `GET /api/bridge/discovery/dossier` · probes system/expand/margin/cost |
+| Tiny `sales.summary` | ainda `unavailable` — probe ok; gates parciais (falta `approved_to_publish` + `cost_field`≠defer) · recon UI oficial **aligned_sample** (overlap Nº última página API) · `docs/SALES_SUMMARY_PACOTE.md` |
+| Discovery UI Playwright | dossiê consolidado `docs/TINY_DISCOVERY_DOSSIER.md` · `GET /api/bridge/discovery/dossier` · probes system/expand/margin/cost · **gerar** avaliação/contribuição (últimos 7 dias → tabela 100 linhas) |
 | Tiny `margins.summary` | `unavailable` (slot criado; sem publish) |
 | Evidence sales | `/root/knowt-data/evidence/sales_probe_*.json` + `sales_summary_gates.json` |
 | Data path | `/root/knowt-data` |
 | API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
 | Chat answer | `POST /v1/chat/answer` · períodos + situação · Bearer `KNOWT_API_TOKEN` |
 | Contagem período | 1ª+última página Tiny (`page_bounds`) — sem varrer todas as páginas |
-| Agenda / tarefas | JSON local `agenda.json` + `tasks.json` via `/api/bridge` (sem Google no MVP) |
+| Agenda / tarefas | JSON local + OAuth Google Calendar/Tasks (scaffold) · `docs/GOOGLE.md` · falta Client ID/Secret no `.env` para ligar |
 | Audit | `/root/knowt-data/audit/answers.jsonl` |
 | Nginx / TLS | rascunho `deploy/nginx-knowt.example.conf` — ver `docs/DNS.md` |
 
@@ -89,9 +89,14 @@ Até lá a API fica só em loopback + Bearer `KNOWT_API_TOKEN`.
 4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~ · ~~contagem page_bounds~~ · ~~orders.detail + catálogo no chat~~ · ~~resumo por situação + amostra/ecommerce~~  
 5. ~~Discovery UI Playwright (fatia custos Tiny)~~ · expandir crawl/páginas + discovery API real  
 6. ~~DNS knowt + Nginx/TLS (+ firewall 80/443)~~  
-7. ~~Chat web piloto em knowt.com.br~~ · Hermes Telegram/WhatsApp ainda TBD  
+7. ~~Chat web piloto em knowt.com.br~~ · ~~Telegram bot fino (long poll → bridge)~~ · ~~Hermes SOUL/MCP (`knowt-gateway`)~~ · WhatsApp / hermes-gateway Telegram ainda TBD  
 8. ~~Pacote técnico sales.summary (probe + gates, sem publish)~~ · publish live só após checklist de negócio  
-9. Hermes Telegram/WhatsApp ainda TBD  
+9. ~~LLM Hermes no Telegram~~ (`KNOWT_ASSISTANT_ENGINE=hermes`) · ~~WhatsApp webhook no bridge~~ · activar com credenciais Meta (`docs/WHATSAPP.md`)  
+10. ~~Google Calendar/Tasks OAuth no bridge~~ · humano: Client ID/Secret + auth-url (`docs/GOOGLE.md`) · depois: repo GitHub remoto · mais fontes · drift/kill-switch  
+
+Telegram: `docs/TELEGRAM.md` · unit `knowt-telegram.service` · exige `KNOWT_TELEGRAM_BOT_TOKEN` no `.env`  
+Hermes: `docs/HERMES.md` · `scripts/configure_hermes_knowt.py` · motor chat Telegram = hermes quando configurado  
+Google: `docs/GOOGLE.md` · sem Client → agenda/tarefas só locais · health `google_connected`
 
 ## Agente
 

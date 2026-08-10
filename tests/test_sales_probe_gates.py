@@ -45,6 +45,22 @@ def test_gates_allow_when_complete(tmp_path: Path):
     assert cap.status == "live"
 
 
+def test_gates_block_when_cost_field_defer(tmp_path: Path):
+    gates = default_gates()
+    gates["answers"] = {
+        "cost_field": "defer",
+        "matches_official_report": "yes",
+        "missing_cost_policy": "block_metric",
+        "cmv_composition_ok": "product_only",
+    }
+    gates["approved_to_publish"] = True
+    gates["approver"] = "negocio@knowt"
+    save_gates(tmp_path, gates)
+    ok, missing = can_publish_sales_summary(tmp_path)
+    assert ok is False
+    assert "cost_field=defer" in missing
+
+
 def test_sales_probe_writes_evidence(tmp_path: Path):
     load_gates(tmp_path)  # seed gates file
     counted = TinyOrdersCount(

@@ -1,0 +1,22 @@
+[Unit]
+Description=knowt Telegram bot (bridge → assistant/chat)
+After=network.target knowt-api.service
+Wants=knowt-api.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/knowt
+Environment=PYTHONPATH=/root/knowt/src
+Environment=KNOWT_ENV=production
+Environment=KNOWT_DATA_DIR=/root/knowt-data
+Environment=KNOWT_TELEGRAM_BRIDGE_URL=http://127.0.0.1:8766
+EnvironmentFile=-/root/knowt/.env
+ExecStart=/root/knowt/.venv/bin/python /root/knowt/scripts/run_telegram_bot.py
+Restart=on-failure
+RestartSec=5
+# token em falta → exit 2 (não reiniciar em loop)
+RestartPreventExitStatus=2
+
+[Install]
+WantedBy=multi-user.target

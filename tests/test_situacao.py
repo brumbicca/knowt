@@ -30,4 +30,7 @@ def test_parse_situacao_none():
 def test_wants_breakdown():
     assert wants_situacao_breakdown("resumo de pedidos esta semana")
     assert wants_situacao_breakdown("pedidos por situação últimos 7 dias")
+    assert wants_situacao_breakdown("Ok, por situação")
+    assert wants_situacao_breakdown("por situação")
+    assert wants_situacao_breakdown("detalhe por situações")
     assert not wants_situacao_breakdown("pedidos cancelados esta semana")

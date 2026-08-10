@@ -72,6 +72,10 @@ def save_gates(data_dir: Path, data: Dict[str, Any]) -> Dict[str, Any]:
 def missing_gate_fields(gates: Dict[str, Any]) -> List[str]:
     answers = gates.get("answers") or {}
     missing = [k for k in REQUIRED_ANSWERS if not answers.get(k)]
+    # «defer» preenche a chave mas bloqueia publish até o dono escolher o campo
+    if str(answers.get("cost_field") or "").strip().lower() == "defer":
+        if "cost_field" not in missing:
+            missing.append("cost_field=defer")
     if not gates.get("approved_to_publish"):
         missing.append("approved_to_publish")
     if gates.get("approved_to_publish") and not (gates.get("approver") or "").strip():

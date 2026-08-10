@@ -17,6 +17,8 @@ class Settings:
     api_token: str
     chat_password: str
     secret_key: str
+    mongo_uri: str
+    mongo_db: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -33,4 +35,11 @@ class Settings:
             api_token=(os.getenv("KNOWT_API_TOKEN") or "").strip(),
             chat_password=(os.getenv("KNOWT_CHAT_PASSWORD") or "").strip(),
             secret_key=secret,
+            mongo_uri=(
+                os.getenv("KNOWT_MONGO_URI") or os.getenv("MONGO_URI") or "mongodb://127.0.0.1:27017"
+            ).strip(),
+            mongo_db=(
+                os.getenv("KNOWT_MONGO_DB") or os.getenv("MONGO_DB_NAME") or "knowt"
+            ).strip()
+            or "knowt",
         )

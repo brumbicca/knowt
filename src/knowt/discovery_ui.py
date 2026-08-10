@@ -851,7 +851,7 @@ def probe_system_expand(
     source_id: str = "tinyerp",
     headless: bool = True,
     timeout_ms: int = 45_000,
-    max_pages: int = 35,
+    max_pages: int = 50,
 ) -> Dict[str, Any]:
     """Abre menus laterais, inventaria sublinks e visita páginas novas do ERP."""
     from playwright.sync_api import sync_playwright
@@ -1040,12 +1040,212 @@ def _collect_filter_labels(page, *, limit: int = 40) -> List[str]:
     return _clean_texts(texts, limit=limit)
 
 
+def _open_margin_filter_modal(page) -> Dict[str, Any]:
+    """Abre o modal Filtrar do relatório personalizado (empty-state ou botão)."""
+    info: Dict[str, Any] = {"opened": False, "via": None}
+    try:
+        if page.locator(".modal-content h3.modal-title", has_text=re.compile(r"Filtrar", re.I)).count():
+            info["opened"] = True
+            info["via"] = "already_open"
+            return info
+    except Exception:
+        pass
+    for sel in (
+        ".empty-state-box button.btn-primary",
+        "button.btn-primary:has-text('gerar relatório')",
+        "button:has-text('gerar relatório')",
+        "button:has-text('atualizar relatório')",
+        "button:has-text('Filtros')",
+    ):
+        try:
+            loc = page.locator(sel).first
+            if loc.count() == 0:
+                continue
+            loc.click(timeout=4000)
+            page.wait_for_timeout(1200)
+            if page.locator(".modal-content h3.modal-title", has_text=re.compile(r"Filtrar", re.I)).count():
+                info["opened"] = True
+                info["via"] = sel
+                return info
+        except Exception:
+            continue
+    return info
+
+
+def _select_multiselect_all(page, *, label_regex: str) -> bool:
+    """Abre um bootstrap-multiselect pelo label e marca «Selecionar todas»."""
+    try:
+        modal = page.locator(".modal-content").first
+        # Preferir o 1º multiselect do modal (Situações costuma ser o primeiro)
+        toggles = modal.locator(".multiselect-selected-text, button.multiselect")
+        if toggles.count() == 0:
+            # fallback: procurar pelo label
+            group = page.locator("label", has_text=re.compile(label_regex, re.I)).first
+            if group.count() == 0:
+                return False
+            form_group = group.locator(
+                "xpath=ancestor::*[contains(@class,'form-group') or contains(@class,'campo')][1]"
+            )
+            root = form_group if form_group.count() else group.locator("xpath=..")
+            toggles = root.locator(".multiselect-selected-text, button.multiselect")
+        if toggles.count() == 0:
+            return False
+        toggles.first.click(timeout=3500)
+        page.wait_for_timeout(500)
+        containers = page.locator("ul.multiselect-container")
+        for i in range(min(containers.count(), 8)):
+            c = containers.nth(i)
+            box = c.bounding_box()
+            if not box or box.get("width", 0) < 20 or box.get("height", 0) < 20:
+                continue
+            # clicar checkbox «Selecionar todas» com force (labels 0x0 no layout Tiny)
+            lab = c.locator("label.checkbox").filter(
+                has_text=re.compile(r"Selecionar todas", re.I)
+            ).first
+            if lab.count() == 0:
+                lab = c.get_by_text(re.compile(r"Selecionar todas", re.I)).first
+            if lab.count() == 0:
+                continue
+            try:
+                lab.click(timeout=2500, force=True)
+            except Exception:
+                # clique via JS no input
+                ok = c.evaluate(
+                    """(root) => {
+                      const labs = Array.from(root.querySelectorAll('label.checkbox, label'));
+                      for (const lab of labs) {
+                        const t = (lab.innerText || '').trim().toLowerCase();
+                        if (!t.includes('selecionar todas')) continue;
+                        const input = lab.querySelector('input') || lab;
+                        input.click();
+                        return true;
+                      }
+                      return false;
+                    }"""
+                )
+                if not ok:
+                    continue
+            page.wait_for_timeout(350)
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def _try_apply_report_period(page, *, date_from: str, date_to: str) -> Dict[str, Any]:
+    """Abre modal Filtrar, aplica período/situações e gera o relatório."""
+    info: Dict[str, Any] = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "filled": 0,
+        "generated": False,
+        "error": None,
+        "steps": [],
+        "shortcut": None,
+        "situacoes_all": False,
+    }
+    try:
+        opened = _open_margin_filter_modal(page)
+        info["filter_modal"] = opened
+        info["steps"].append(f"open_modal:{opened.get('via')}")
+        if not opened.get("opened"):
+            info["error"] = "filter_modal_not_opened"
+            return info
+
+        modal = page.locator(".modal-content").first
+        # Atalho: Últimos 7 dias (já costuma vir activo) — alinhado ao probe 7d
+        try:
+            chip = modal.locator("button", has_text=re.compile(r"Últimos\s*7\s*dias", re.I)).first
+            if chip.count():
+                chip.click(timeout=3000)
+                info["steps"].append("click_chip:ultimos_7_dias")
+                info["shortcut"] = "ultimos_7_dias"
+                info["filled"] = 2
+                page.wait_for_timeout(400)
+        except Exception as exc:
+            info["steps"].append(f"chip7_fail:{type(exc).__name__}")
+
+        # Período custom se as datas não forem o atalho 7d (ainda tenta)
+        if date_from and date_to:
+            try:
+                per = modal.locator("button", has_text=re.compile(r"^Per[ií]odo$", re.I)).first
+                if per.count() and info.get("shortcut") != "ultimos_7_dias":
+                    per.click(timeout=2500)
+                    info["steps"].append("click_chip:periodo")
+                    page.wait_for_timeout(600)
+                    inputs = modal.locator("input[type='date'], input[placeholder*='/']")
+                    if inputs.count() >= 2:
+                        inputs.nth(0).fill(date_from, timeout=2000)
+                        inputs.nth(1).fill(date_to, timeout=2000)
+                        info["filled"] = 2
+                        info["shortcut"] = "periodo_custom"
+                        info["steps"].append("fill_periodo_inputs")
+            except Exception as exc:
+                info["steps"].append(f"periodo_fail:{type(exc).__name__}")
+
+        info["situacoes_all"] = _select_multiselect_all(page, label_regex=r"Situa[cç][oõ]es da venda")
+        info["steps"].append(f"situacoes_all:{info['situacoes_all']}")
+
+        # Gerar no rodapé do modal (evita botões do header)
+        gen = modal.locator("button.btn-primary", has_text=re.compile(r"gerar relat", re.I))
+        if gen.count() == 0:
+            gen = page.locator(".modal-content button.btn-primary", has_text=re.compile(r"gerar relat", re.I))
+        gen.last.click(timeout=5000)
+        info["generated"] = True
+        info["generate_selector"] = "modal.gerar"
+        info["steps"].append("generate:modal")
+        page.wait_for_timeout(7000)
+
+        body = re.sub(r"\s+", " ", page.inner_text("body")[:2500]).strip()
+        info["body_preview"] = body[:700]
+        info["still_on_filter"] = bool(
+            re.search(r"configurando os filtros|modal-title", body, re.I)
+            and page.locator(".modal-content h3.modal-title", has_text=re.compile(r"Filtrar", re.I)).count()
+        )
+        meta = page.evaluate(
+            """() => {
+              const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+              const th = Array.from(document.querySelectorAll('th'))
+                .map(el => norm(el.innerText)).filter(Boolean).slice(0, 40);
+              const rows = document.querySelectorAll('table tbody tr').length;
+              const money = [];
+              const re = /R\\$\\s*[\\d.,]+|[\\d]+,[\\d]{2}/g;
+              const blob = norm(document.body.innerText).slice(0, 4000);
+              const totals = [];
+              for (const el of Array.from(document.querySelectorAll(
+                '.totalizadores, .totais, tfoot, [class*=total]'
+              ))) {
+                const t = norm(el.innerText);
+                if (t && t.length < 300) totals.push(t);
+              }
+              // amostra de células numéricas da 1ª linha
+              const first = Array.from(document.querySelectorAll('table tbody tr:first-child td'))
+                .map(el => norm(el.innerText)).filter(Boolean).slice(0, 20);
+              return { table_headers: th, row_count: rows, totals_blocks: totals.slice(0, 10), first_row: first };
+            }"""
+        )
+        info["result"] = meta
+        info["totals_sample"] = list((meta or {}).get("totals_blocks") or [])[:12]
+        info["table_headers"] = list((meta or {}).get("table_headers") or [])[:30]
+        info["row_count"] = int((meta or {}).get("row_count") or 0)
+        info["ok_generated_table"] = info["row_count"] > 0 and not info["still_on_filter"]
+    except Exception as exc:  # noqa: BLE001
+        info["error"] = f"{type(exc).__name__}:{exc}"[:180]
+    return info
+
+
 def probe_margin_reports(
     data_dir: Path,
     *,
     source_id: str = "tinyerp",
     headless: bool = True,
     timeout_ms: int = 60_000,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Abre relatórios de margem no módulo Vendas → evidência (sem publish)."""
     from playwright.sync_api import sync_playwright
@@ -1059,6 +1259,7 @@ def probe_margin_reports(
         "at": _now_iso(),
         "source_id": source_id,
         "hub_url": hub_url,
+        "period": {"date_from": date_from, "date_to": date_to},
         "ok": False,
         "login_wall": False,
         "state_path": str(state),
@@ -1151,7 +1352,11 @@ def probe_margin_reports(
                     entry["available_columns_sample"] = []
                     entry["customized"] = False
 
-                    for pers_sel in (
+                    # Com período: gerar tabela primeiro (personalizar muda o ecrã).
+                    # Sem período: inspeccionar schema via «personalizar relatório».
+                    do_generate = bool(date_from and date_to)
+                    if not do_generate:
+                      for pers_sel in (
                         "text=/personalizar relatório/i",
                         "button:has-text('personalizar')",
                     ):
@@ -1248,6 +1453,18 @@ def probe_margin_reports(
                         except Exception:
                             continue
 
+                    if do_generate:
+                        entry["period_attempt"] = _try_apply_report_period(
+                            page, date_from=date_from, date_to=date_to
+                        )
+                        pa = entry["period_attempt"] or {}
+                        if pa.get("table_headers"):
+                            entry["table_headers"] = pa.get("table_headers")
+                        if pa.get("body_preview"):
+                            entry["body_preview"] = pa.get("body_preview")
+                        entry["generated_rows"] = pa.get("row_count")
+                        entry["generated_ok"] = bool(pa.get("ok_generated_table"))
+
                     if not entry.get("body_preview"):
                         try:
                             entry["body_preview"] = re.sub(
@@ -1257,6 +1474,8 @@ def probe_margin_reports(
                             entry["body_preview"] = None
 
                     blob = " ".join(entry.get("columns") or []).lower()
+                    if not blob:
+                        blob = " ".join(entry.get("table_headers") or []).lower()
                     entry["hints"] = {
                         "has_revenue_fields": any(
                             x in blob
@@ -1285,11 +1504,12 @@ def probe_margin_reports(
             out["ok"] = any(r.get("ok") for r in reports)
             out["reports_ok"] = sum(1 for r in reports if r.get("ok"))
             out["reports_total"] = len(reports)
+            out["generated_ok"] = sum(1 for r in reports if r.get("generated_ok"))
             out["findings"] = [
                 "Relatórios personalizados: Avaliação de margem → #/view/27",
                 "Relatórios personalizados: Margem de Contribuição → #/view/17",
                 "Schema via «personalizar relatório» (colunas seleccionadas + catálogo)",
-                "UI exige filtros antes de gerar resultado tabular",
+                "Geração: modal Filtrar → chip período → gerar relatório",
                 "Não extrair CMV daqui sem cost_field + período alinhado ao probe",
             ]
             if not out["ok"]:

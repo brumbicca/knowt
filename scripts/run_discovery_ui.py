@@ -70,13 +70,25 @@ def main() -> int:
         help="Abre menus laterais e visita sublinks ainda não mapeados",
     )
     p_exp.add_argument("--headed", action="store_true")
-    p_exp.add_argument("--max-pages", type=int, default=35)
+    p_exp.add_argument("--max-pages", type=int, default=50)
 
     p_marg = sub.add_parser(
         "probe-margin-reports",
         help="Abre relatórios Tiny de margem (Avaliação + Contribuição)",
     )
     p_marg.add_argument("--headed", action="store_true")
+    p_marg.add_argument(
+        "--from",
+        dest="date_from",
+        default=None,
+        help="Data início filtro relatório (ex. 03/08/2026)",
+    )
+    p_marg.add_argument(
+        "--to",
+        dest="date_to",
+        default=None,
+        help="Data fim filtro relatório (ex. 09/08/2026)",
+    )
 
     p_probe = sub.add_parser("probe-cost", help="Produto → aba Custos → evidence")
     p_probe.add_argument("--product-id", default=None)
@@ -173,24 +185,45 @@ def main() -> int:
         evidence = probe_margin_reports(
             settings.data_dir,
             headless=not args.headed,
+            date_from=args.date_from,
+            date_to=args.date_to,
         )
         print(
             json.dumps(
                 {
                     "ok": evidence.get("ok"),
                     "path": evidence.get("path"),
+                    "period": evidence.get("period"),
                     "hub_report_names": (evidence.get("hub_report_names") or [])[:20],
                     "reports_ok": evidence.get("reports_ok"),
+                    "generated_ok": evidence.get("generated_ok"),
                     "reports": [
                         {
                             "key": r.get("key"),
                             "ok": r.get("ok"),
                             "clicked": r.get("clicked"),
                             "customized": r.get("customized"),
+                            "generated_ok": r.get("generated_ok"),
+                            "generated_rows": r.get("generated_rows"),
                             "title": r.get("page_title"),
                             "url": r.get("url"),
                             "columns": (r.get("columns") or [])[:20],
+                            "table_headers": (r.get("table_headers") or [])[:15],
                             "costish": (r.get("available_columns_sample") or [])[:15],
+                            "period_attempt": {
+                                "ok_generated_table": (r.get("period_attempt") or {}).get(
+                                    "ok_generated_table"
+                                ),
+                                "shortcut": (r.get("period_attempt") or {}).get("shortcut"),
+                                "situacoes_all": (r.get("period_attempt") or {}).get(
+                                    "situacoes_all"
+                                ),
+                                "row_count": (r.get("period_attempt") or {}).get("row_count"),
+                                "steps": (r.get("period_attempt") or {}).get("steps"),
+                                "error": (r.get("period_attempt") or {}).get("error"),
+                            }
+                            if r.get("period_attempt")
+                            else None,
                             "hints": r.get("hints"),
                             "error": r.get("error"),
                         }
