@@ -182,6 +182,39 @@ CATALOG: list[CatalogEntry] = [
         "description_pt": "Gera URL OAuth Google Calendar+Tasks (requer Client ID/Secret). Ver docs/GOOGLE.md.",
         "exemplos": [],
     },
+    {
+        "id": "fonte_status",
+        "domain": "sistema",
+        "bridge_path": "/fonte/status",
+        "bridge_status": "live",
+        "method": "GET",
+        "query_params": ["source_id", "periodo"],
+        "description_pt": (
+            "Estado da fonte: health, kill switch, coverage, último drift e contratos."
+        ),
+        "exemplos": ["Estado da fonte Tiny?", "A fonte está suspensa?"],
+    },
+    {
+        "id": "contratos",
+        "domain": "contratos",
+        "bridge_path": "/contratos",
+        "bridge_status": "live",
+        "method": "GET",
+        "description_pt": (
+            "Lista contratos versionados (orders.v1 published, sales.v1 draft)."
+        ),
+        "exemplos": ["Que contratos estão publicados?"],
+    },
+    {
+        "id": "drift_events",
+        "domain": "drift",
+        "bridge_path": "/drift/events",
+        "bridge_status": "live",
+        "method": "GET",
+        "query_params": ["source_id", "limite"],
+        "description_pt": "Histórico de eventos de drift (schema/contrato/recon).",
+        "exemplos": ["Houve drift na Tiny?"],
+    },
 ]
 
 WRITE_ACTIONS = [
@@ -202,6 +235,18 @@ WRITE_ACTIONS = [
         "method": "POST",
         "description_pt": "Criar evento (Google Calendar se ligado + espelho local).",
         "body_exemplo": {"title": "Call Tiny", "when": "2026-08-10T15:00:00"},
+    },
+    {
+        "path": "/fontes/{source_id}/kill-switch",
+        "method": "POST",
+        "description_pt": "Suspender/reactivar fonte (kill switch). Exige reason ao suspender.",
+        "body_exemplo": {"suspended": True, "reason": "drift crítico", "actor": "ops"},
+    },
+    {
+        "path": "/drift/check",
+        "method": "POST",
+        "description_pt": "Corre check de drift (nunca auto-kill). Ver docs/DRIFT_KILL_CONTRATOS.md.",
+        "body_exemplo": {"source_id": "tinyerp", "actor": "ops"},
     },
 ]
 

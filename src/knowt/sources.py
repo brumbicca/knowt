@@ -72,7 +72,7 @@ def seed_tiny_draft(registry: SourceRegistry, *, org_id: str = "default") -> Sou
         source_id="tinyerp",
         system="tiny-erp",
         org_id=org_id,
-        status="draft",
+        status="active",
         secret_refs={"api_token": "KNOWT_SECRET_TINY_TOKEN"},
         capabilities=[
             Capability(

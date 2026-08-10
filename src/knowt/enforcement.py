@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from knowt.models import Capability
 from knowt.order_id import extract_order_id
+from knowt.kill_switch import is_suspended
 from knowt.sources import SourceRegistry
 
 # (capability_id preferida, padrões) — ordem importa
@@ -133,6 +134,19 @@ def enforce(
             mode="refuse",
             message="Fonte desconhecida. Sem fonte validada não há resposta factual.",
             reason_code="SOURCE_NOT_FOUND",
+            source_id=source_id,
+        )
+
+    if is_suspended(registry, source_id):
+        ks_reason = getattr(src, "kill_switch_reason", None) or "sem motivo"
+        return EnforcementResult(
+            allow_llm=False,
+            mode="refuse",
+            message=(
+                f"Fonte `{source_id}` está **suspensa** (kill switch). "
+                f"Motivo: {ks_reason}. Não consulto dados nem invento factos."
+            ),
+            reason_code="SOURCE_SUSPENDED",
             source_id=source_id,
         )
 

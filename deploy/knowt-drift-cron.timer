@@ -1,0 +1,12 @@
+[Unit]
+Description=knowt drift check every 2 hours
+Requires=knowt-drift-cron.service
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=2h
+Persistent=true
+Unit=knowt-drift-cron.service
+
+[Install]
+WantedBy=timers.target

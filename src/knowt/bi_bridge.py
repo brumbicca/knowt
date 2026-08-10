@@ -21,8 +21,19 @@ from knowt.agenda_store import (
 from knowt.agent_catalog import agent_catalog_payload
 from knowt.answers import answer_chat
 from knowt.audit import append_answer_audit, audit_path_for
+from knowt.contracts import (
+    contracts_summary,
+    ensure_seed_contracts,
+    list_contracts,
+    load_contract,
+    set_contract_status,
+)
+from knowt.drift import last_event as drift_last_event
+from knowt.drift import list_events as drift_list_events
+from knowt.drift import run_drift_check
 from knowt.google_oauth import build_auth_url, exchange_code, status as google_oauth_status
 from knowt.hermes_chat import assistant_engine, hermes_available, run_hermes_chat
+from knowt.kill_switch import kill_switch_status, set_kill_switch
 from knowt.mongo import ping_mongo
 from knowt.orgs import OrgRegistry, assert_source_in_org, default_org_id, seed_default_org
 from knowt.order_breakdown import breakdown_por_situacao, format_breakdown_short
@@ -106,6 +117,7 @@ def create_bi_bridge_blueprint(
     bp = Blueprint("bi_bridge", __name__, url_prefix="/api/bridge")
     orgs = org_registry or OrgRegistry(Path(data_dir))
     seed_default_org(orgs)
+    ensure_seed_contracts(Path(data_dir))
 
     def _auth_ok() -> bool:
         expected = (api_token or "").strip()
@@ -577,7 +589,7 @@ def create_bi_bridge_blueprint(
 
     @bp.get("/fonte/status")
     def fonte_status():
-        """Proveniência honest para o strip da UI (sem espelho Mongo)."""
+        """Proveniência + kill switch + último drift (sem espelho Mongo)."""
         registry.load()
         sid = (request.args.get("source_id") or "tinyerp").strip() or "tinyerp"
         src = registry.get(sid)
@@ -586,42 +598,60 @@ def create_bi_bridge_blueprint(
             for c in (src.capabilities if src else [])
             if getattr(c, "status", None) == "live"
         ]
+        ks = kill_switch_status(registry, sid)
+        suspended = bool(ks.get("suspended"))
         period = _period_from_args()
         d0, d1 = period.tiny_bounds()
         pedidos = 0
         count_ok = False
-        try:
-            counted = count_orders_in_period(_token(), data_inicial=d0, data_final=d1)
-            count_ok = counted.ok
-            pedidos = int(counted.total_orders or 0) if counted.ok else 0
-        except Exception:
-            pedidos = int((registry.get("tinyerp") and 0) or 0)
+        if not suspended:
+            try:
+                counted = count_orders_in_period(
+                    _token(), data_inicial=d0, data_final=d1
+                )
+                count_ok = counted.ok
+                pedidos = int(counted.total_orders or 0) if counted.ok else 0
+            except Exception:
+                pedidos = 0
+                count_ok = False
         name = "Tiny ERP"
         if sid != "tinyerp" and src is not None:
             name = str(getattr(src, "system", None) or sid)
+        source_status = (
+            "suspended"
+            if suspended
+            else (str(getattr(src, "status", None) or "active") if src else "unknown")
+        )
+        health = "suspended" if suspended else ("ok" if count_ok else "warning")
+        drift_last = drift_last_event(Path(data_dir), sid)
         return jsonify(
             {
                 "ok": True,
                 "source_id": sid,
-                "health": "ok" if count_ok else "warning",
+                "health": health,
                 "shadow": False,
                 "source": {
                     "id": sid,
                     "name": name,
-                    "db_name": "bi_tinyerp" if sid == "tinyerp" else sid,
+                    "db_name": "live_api" if sid == "tinyerp" else sid,
                     "builtin": True,
                     "role": "erp",
-                    "status": "active",
+                    "status": source_status,
                     "is_mirror": False,
                 },
+                "kill_switch": ks,
                 "freshness": {
                     "field": "tiny_api_live",
                     "at": None,
                     "age_minutes": 0 if count_ok else None,
                     "pedidos_count": pedidos,
-                    "ok": count_ok,
+                    "ok": count_ok and not suspended,
                     "sla_minutes": 0,
-                    "state": "fresh" if count_ok else "unknown",
+                    "state": (
+                        "suspended"
+                        if suspended
+                        else ("fresh" if count_ok else "unknown")
+                    ),
                 },
                 "coverage": {
                     "pedidos_count": pedidos,
@@ -629,14 +659,116 @@ def create_bi_bridge_blueprint(
                     "recon_ok": None,
                     "capabilities": live_caps,
                     "capabilities_count": len(live_caps),
+                    "contracts": contracts_summary(Path(data_dir)),
                 },
-                "drift": {"last": None},
+                "drift": {
+                    "last": drift_last,
+                    "suggest_kill_switch": bool(
+                        (drift_last or {}).get("suggest_kill_switch")
+                    ),
+                },
                 "provenance": {
                     "label_pt": "Tiny ERP · API ao vivo",
-                    "contract_hint": "sem espelho Mongo · zero verdade silenciosa",
+                    "contract_hint": (
+                        "orders.v1 published · sales.v1 draft · zero verdade silenciosa"
+                    ),
                 },
             }
         )
+
+    @bp.post("/fontes/<source_id>/kill-switch")
+    def fontes_kill_switch(source_id: str):
+        registry.load()
+        payload = request.get_json(silent=True) or {}
+        suspended = payload.get("suspended")
+        if suspended is None:
+            suspended = payload.get("kill") in (True, "1", "true", "yes", "on")
+        reason = str(payload.get("reason") or "").strip()
+        actor = str(payload.get("actor") or "operator").strip() or "operator"
+        try:
+            out = set_kill_switch(
+                registry,
+                source_id,
+                suspended=bool(suspended),
+                reason=reason,
+                actor=actor,
+            )
+        except KeyError:
+            return jsonify({"ok": False, "error": "source_not_found"}), 404
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, "fonte": out})
+
+    @bp.post("/drift/check")
+    def drift_check():
+        registry.load()
+        payload = request.get_json(silent=True) or {}
+        sid = (
+            str(
+                payload.get("source_id")
+                or request.args.get("source_id")
+                or "tinyerp"
+            ).strip()
+            or "tinyerp"
+        )
+        actor = str(payload.get("actor") or "operator").strip() or "operator"
+        event = run_drift_check(
+            Path(data_dir),
+            registry,
+            source_id=sid,
+            actor=actor,
+        )
+        return jsonify({"ok": True, "event": event})
+
+    @bp.get("/drift/events")
+    def drift_events():
+        sid = (request.args.get("source_id") or "").strip() or None
+        try:
+            limite = int(request.args.get("limite") or request.args.get("limit") or 20)
+        except ValueError:
+            limite = 20
+        rows = drift_list_events(Path(data_dir), source_id=sid, limit=limite)
+        return jsonify({"ok": True, "events": rows, "count": len(rows)})
+
+    @bp.get("/contratos")
+    def contratos_list():
+        ensure_seed_contracts(Path(data_dir))
+        rows = list_contracts(Path(data_dir))
+        return jsonify(
+            {
+                "ok": True,
+                "summary": contracts_summary(Path(data_dir)),
+                "contracts": rows,
+            }
+        )
+
+    @bp.get("/contratos/<contract_id>/<version>")
+    def contratos_get(contract_id: str, version: str):
+        doc = load_contract(Path(data_dir), contract_id, version)
+        if not doc:
+            return jsonify({"ok": False, "error": "contract_not_found"}), 404
+        return jsonify({"ok": True, "contract": doc})
+
+    @bp.post("/contratos/<contract_id>/<version>/status")
+    def contratos_set_status(contract_id: str, version: str):
+        payload = request.get_json(silent=True) or {}
+        status = str(payload.get("status") or "").strip()
+        actor = str(payload.get("actor") or "operator").strip() or "operator"
+        note = str(payload.get("note") or "").strip()
+        try:
+            doc = set_contract_status(
+                Path(data_dir),
+                contract_id,
+                version,
+                status=status,
+                actor=actor,
+                note=note,
+            )
+        except KeyError:
+            return jsonify({"ok": False, "error": "contract_not_found"}), 404
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, "contract": doc})
 
     @bp.get("/sync/status")
     def sync_status():
@@ -801,6 +933,27 @@ def create_bi_bridge_blueprint(
             ), 403
         if not message:
             return jsonify({"ok": False, "error": "empty", "message": "Mensagem vazia"})
+        ks = kill_switch_status(registry, source_id)
+        if ks.get("suspended"):
+            msg = (
+                f"Fonte `{source_id}` está **suspensa** (kill switch). "
+                f"Motivo: {ks.get('reason') or 'n/d'}. Não consulto dados."
+            )
+            return jsonify(
+                {
+                    "ok": True,
+                    "reply": msg,
+                    "answer": msg,
+                    "enforcement": {
+                        "allow_llm": False,
+                        "mode": "refuse",
+                        "reason_code": "SOURCE_SUSPENDED",
+                        "source_id": source_id,
+                        "message": msg,
+                    },
+                    "engine": "deterministic",
+                }
+            )
         channel = ""
         if isinstance(ctx, dict):
             channel = str(ctx.get("channel") or "").strip().lower()

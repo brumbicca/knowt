@@ -1,0 +1,14 @@
+[Unit]
+Description=knowt drift check (once)
+After=network.target knowt-api.service
+Wants=knowt-api.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/knowt
+Environment=KNOWT_ENV_FILE=/root/knowt/.env
+Environment=KNOWT_DATA_DIR=/root/knowt-data
+Environment=PYTHONPATH=/root/knowt/src
+ExecStart=/root/knowt/.venv/bin/python /root/knowt/scripts/run_drift_cron.py
+Nice=10

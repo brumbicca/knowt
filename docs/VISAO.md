@@ -1,10 +1,10 @@
 # Visão — knowt (fábrica de compreensão de sistemas)
 
-**Estado:** ideia em amadurecimento · **não implementar ainda**  
-**Data:** 2026-08-08 (decisões nome/piloto/narrativa no mesmo dia)  
+**Estado:** piloto Tiny em curso · critério de fecho abaixo (§3.5)  
+**Data:** 2026-08-08 (decisões) · **actualizado:** 2026-08-10 (checklist Tiny fechado)  
 **Relação com Fiesta:** **Fiesta permanece tal qual** (`fiesta-api`, `fiesta-financial`, BI, espelhos, sync). Este documento descreve o produto **knowt**, ao lado, que herda o *plano* e o *aprendizado*, não o monólito operacional.
 
-**Nome do produto:** **knowt** (domínio já reservado; VPS ainda não).  
+**Nome do produto:** **knowt** (domínio + VPS + repo activos — ver `c:\Apps\knowt\HANDOFF.md`).  
 **Frase interna / técnica:** *fábrica de compreensão de sistemas*.  
 **Frase de produto:**
 
@@ -109,6 +109,38 @@ Prioridade alta — já existem pedaços úteis no repo Fiesta:
 - **Primeiro piloto do knowt: Tiny ERP / Olist** — reaproveita o aprendizado do §28c no Fiesta, mas o knowt **não** depende do espelho/`bi_tinyerp` do Fiesta como produto; o Tiny volta a ser onboarded *na narrativa knowt* (chat + Insights + contratos).
 - Tray shadow, Salesforce Bello e o próprio Fiesta operacional continuam **laboratório / referência** — não o pitch do knowt.
 
+### 3.5 Critério «Tiny fechado» (decisão 2026-08-10)
+
+**Fonte operacional no repo knowt:** `c:\Apps\knowt\docs\PILOTO_TINY_FECHADO.md` (checklist espelhada abaixo).
+
+**Princípio:** fechar o **loop do plano com Tiny** antes de qualquer 2ª fonte.  
+“Plano completo com Tiny” = loop de verdade comprovado no piloto — **não** implementar cada parágrafo do doc de onboarding (codegen §8.12, multi-SaaS, etc. ficam **fora** deste critério).
+
+**Prioridade de trabalho até green:** só Tiny + operação do piloto.  
+**Proibido até green:** 2ª fonte, multi-tenant SaaS, gerador genérico de conector.
+
+#### Checklist (fonte de verdade também em `c:\Apps\knowt\HANDOFF.md`)
+
+| # | Critério | Estado | Notas |
+|---|---|---|---|
+| T1 | `orders.list` + `orders.detail` **live** + contagem/período/situação | **OK** | API Tiny ao vivo; sem inventar R$ |
+| T2 | Chat recusa o que não é live (`sales`/`margins`) | **OK** | Enforcement + reason codes |
+| T3 | Hermes/Telegram respondem dentro do catálogo (DoD paths) | **OK** | Motor hermes; breakdown situação → determinístico |
+| T4 | Contratos versionados (`orders.v1` published, `sales.v1` draft) | **OK** | Hash + registry em `data/contracts` |
+| T5 | Kill switch por fonte + chat respeita `SOURCE_SUSPENDED` | **OK** | Manual; nunca auto no drift |
+| T6 | Drift (schema/contrato) com alerta `suggest_kill_switch` | **OK** | API; cron+alerta em T8 |
+| T7 | Discovery/dossiê consultável e alinhado ao que o chat diz | **parcial** | Dossiê existe; reforçar smoke guião vs API |
+| T8 | Drift em **cron** VPS + alerta (Telegram ou log watchdog) | **OK** | timer 2 h · `run_drift_cron.py` |
+| T9 | Recon amostra/oficial alinhada às respostas do chat (pedidos) | **parcial** | Há aligned_sample sales; fechar smoke demo pedidos |
+| T10 | `sales.summary` / margem **ou** decisão explícita «piloto sem receita até CMV» | **bloqueado negócio** | Humano: `cost_field` + `approved_to_publish` |
+| T11 | Guião demo estável (web + Telegram) com números batendo | **pendente** | Checklist de perguntas fixas + evidência |
+| T12 | Commit/push do estado actual no GitHub knowt | **OK** | fatia drift/kill + cron |
+
+**Green do piloto** = T1–T6 OK + T8 + T11 + (T10 resolvido **ou** decisão escrita «sem receita no piloto»).  
+T7/T9: fechar com smoke, não com refactor grande.
+
+**Depois do green (não antes):** 2ª fonte mínima · WhatsApp com Meta · Google OAuth com credenciais · codegen §8.12.
+
 ---
 
 ## 4. Arquitectura alvo (nível bloco)
@@ -182,18 +214,16 @@ Preparar o sucessor **antes** do primeiro deploy na VPS nova, não depois de ter
 
 ---
 
-## 6. Roadmap de amadurecimento (sem código de produto ainda)
+## 6. Roadmap de amadurecimento
 
-Ordem saudável:
+Ordem saudável (actualizado 2026-08-10):
 
-1. **Congelar a frase de produto** e o que *não* é (este doc §1) — revisão humana.
-2. **Mapa de herança v1** (§3) — marcar “MVP 0” vs “depois”.
-3. **Decisão repo + VPS** (§5) — registar escolha abaixo.
-4. **Nome / domínio / posicionamento** (empresa única vs multi-tenant SaaS).
-5. ~~**Primeiro sistema piloto**~~ — **Tiny** (knowt); Fiesta Tiny permanece laboratório paralelo.
-6. Só então: esqueleto de código + Hermes na VPS nova (domínio knowt).
+1. ~~Congelar frase de produto~~ · ~~mapa de herança~~ · ~~repo + VPS + Tiny~~  
+2. **Agora — só Tiny até green** (§3.5): ~~T8 cron~~ · T11 guião demo · T10 CMV ou decisão «sem receita» · fechar T7/T9.  
+3. **Depois do green:** 2ª fonte mínima (prova reutilização) · opcional WhatsApp/Google com credenciais.  
+4. **Mais tarde:** codegen conector (§8.12), multi-tenant SaaS, BI rico.
 
-**Não fazer agora:** bifucar `fiesta-api` em produção; apontar Hermes Fiesta para o produto novo; prometer “responde tudo o ERP” em landing.
+**Não fazer agora:** 2ª fonte; bifucar `fiesta-api`; prometer receita/margem sem gates; “responde tudo o ERP” em landing.
 
 ---
 
@@ -202,10 +232,12 @@ Ordem saudável:
 | Tema | Opções | Estado |
 |---|---|---|
 | Nome do produto | knowt | **Decidido** (domínio reservado) |
-| Repo | `c:\Apps\knowt` (git local) | **Decidido** (remote GitHub depois) |
-| VPS | Nova vs mesma isolada | **Proposta: VPS nova** (ainda sem VPS) |
+| Repo | `c:\Apps\knowt` · GitHub `brumbicca/knowt` | **Decidido** |
+| VPS | Nova `179.198.118.171` · knowt.com.br | **Decidido** (activa) |
 | Multi-tenant no dia 1? | Single-tenant MVP; multi depois | **Decidido** (2026-08-08) |
 | Primeiro piloto knowt | Tiny ERP / Olist | **Decidido** |
+| Fecho do piloto | Checklist §3.5 «Tiny fechado» — **só Tiny até green** | **Decidido** (2026-08-10) |
+| 2ª fonte | Só **depois** do green Tiny | **Decidido** (adiada) |
 | BI visual | Só Insights+chat / BI mínimo depois | **Proposta: chat+Insights primeiro** |
 | Relação comercial com Fiesta | Narrativas distintas | **Decidido** (por ora) |
 
@@ -214,13 +246,12 @@ Ordem saudável:
 ## 8. Resumo em uma página
 
 - Fiesta **continua** (narrativa própria).  
-- **knowt** = produto à parte (domínio pronto; VPS/Hermes novos), mesma filosofia do plano de onboarding.  
-- Piloto knowt: **Tiny**.  
-- Leva Discovery, contratos, enforcement, Insights, Hermes DoD.  
+- **knowt** = produto à parte (domínio + VPS + Hermes próprios), mesma filosofia do plano de onboarding.  
+- Piloto knowt: **Tiny** — fechar §3.5 **antes** de 2ª fonte.  
+- Leva Discovery, contratos, enforcement, Insights, Hermes DoD, kill, drift.  
 - Não leva espelho operacional nem stack S1/S2 como núcleo.  
-- Preferência: **repo novo + VPS nova + Hermes novo + HANDOFF.md**.  
 - Chat responde o que estiver **comprovado**; cobertura cresce com validação, não com adivinhação.
 
 ---
 
-*Documento vivo — amadurecer em conversa antes de qualquer implementação.*
+*Documento vivo — §3.5 é o critério operacional actual do piloto.*

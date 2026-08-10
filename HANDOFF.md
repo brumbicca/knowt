@@ -1,7 +1,31 @@
 # HANDOFF — knowt (sucessor / continuidade)
 
 **Actualizado:** 2026-08-10  
-**Origem da conversa de produto:** workspace Fiesta `c:\Apps\fiestaup` · doc espelho `docs/VISAO_FABRICA_COMPREENSAO_SISTEMAS.md`
+**Origem da conversa de produto:** workspace Fiesta `c:\Apps\fiestaup` · visão `docs/VISAO.md` (espelho em fiestaup)
+
+## Prioridade actual (ler primeiro)
+
+**Só Tiny até green.** Critério e checklist: **`docs/PILOTO_TINY_FECHADO.md`** (também `docs/VISAO.md` §3.5).
+
+Não abrir 2ª fonte, SaaS multi-tenant nem codegen de conector antes do green.
+
+| # | Critério | Estado |
+|---|---|---|
+| T1–T6 | orders live, enforcement, Hermes, contratos, kill, drift API | **OK** |
+| T7 | Discovery/dossiê alinhado ao chat | parcial |
+| T8 | Cron drift + alerta | **OK** |
+| T9 | Recon pedidos vs chat (smoke) | parcial |
+| T10 | sales/margem ou decisão «sem receita» | bloqueado negócio |
+| T11 | Guião demo estável | pendente |
+| T12 | GitHub = código da VPS | **OK** |
+
+**Green** = T1–T6 + T8 + T11 + (T10 ou decisão escrita sem receita).
+
+### Ordem até green
+
+1. ~~T12 — commit/push~~ · ~~T8 — cron drift~~  
+2. T11 (+ T7/T9) — guião demo + smokes  
+3. T10 — CMV humano ou decisão «piloto sem receita»
 
 ## O que é isto
 
@@ -15,8 +39,10 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 | Nome / domínio | knowt (domínio reservado) |
 | Narrativa vs Fiesta | Distinta |
 | Piloto | Tiny ERP / Olist |
+| Fecho do piloto | Checklist Tiny fechado — **só Tiny até green** (2026-08-10) |
+| 2ª fonte | Só **depois** do green |
 | Tenancy MVP | Single-tenant com **org registry** (`default`) · API `/organizacoes` · ver `docs/ORGS.md` |
-| Repo | `c:\Apps\knowt` · origin `https://github.com/brumbicca/knowt.git` · main alinhado ao remoto nos commits; há trabalho local por publicar |
+| Repo | `c:\Apps\knowt` · origin `https://github.com/brumbicca/knowt.git` |
 | VPS | Nova · `179.198.118.171` · SSH verificado 2026-08-08 |
 | Hermes | Instância **nova** (não o da VPS Fiesta) |
 
@@ -26,78 +52,58 @@ Produto **knowt**: onboarding autónomo de sistemas externos → contratos → c
 - Refactorizar `fiesta-api` / `fiesta-financial` para “ser” o knowt.
 - Publicar capability / margem / KPI sem validação (mesmo padrão do plano Fiesta §28c.1).
 - Prometer cobertura total do Tiny no dia 1.
+- **Abrir 2ª fonte ou codegen genérico antes do green Tiny** (`docs/PILOTO_TINY_FECHADO.md`).
 
 ## Onde está o aprendizado
 
 | Tema | No Fiesta (referência, só leitura / cópia) |
 |---|---|
 | Plano onboarding | `c:\Apps\fiestaup\docs\PLANO_ONBOARDING_AUTONOMO_SISTEMAS.md` |
-| Visão knowt (espelho) | `c:\Apps\fiestaup\docs\VISAO_FABRICA_COMPREENSAO_SISTEMAS.md` |
+| Visão knowt (espelho) | `c:\Apps\fiestaup\docs\VISAO_FABRICA_COMPREENSAO_SISTEMAS.md` · cópia `docs/VISAO.md` |
 | Piloto Tiny §28c | mesmo plano, secção 28c |
-| Pacote margem Tiny | `docs/TINY_MARGEM_28c1_PACOTE_NEGOCIO.md` |
-| Discovery / semântica / capabilities | `fiesta-api/scripts/fiesta_discovery_*.py`, `fiesta_semantic_engine.py`, etc. — ver `docs/HERANCA_FIESTA.md` |
+| Pacote margem Tiny | Fiesta `docs/TINY_MARGEM_28c1_PACOTE_NEGOCIO.md` / gates knowt |
+| Discovery / semântica / capabilities | `fiesta-api/scripts/fiesta_discovery_*.py`, etc. — ver `docs/HERANCA_FIESTA.md` |
 
-## Infra (a preencher quando existir)
+## Infra
 
 | Item | Valor |
 |---|---|
 | VPS host | `root@179.198.118.171` (`srv1890207.hstgr.cloud`) |
 | SSH key | `%USERPROFILE%\.ssh\id_ed25519_knowt` (comentário `knowt-vps`) |
-| API / chat URL | https://knowt.com.br (TLS 2026-08-08) |
-| Mongo | `127.0.0.1:27017` DB `knowt` · `KNOWT_MONGO_URI` · health `mongo_ok` · **sem** espelho Tiny obrigatório (ver `docs/BANCO.md`) |
-| Hermes home | SPA Insights+Chat em https://knowt.com.br · assistente `/api/bridge` · **Telegram bot fino** (`knowt-telegram`) · **Hermes SOUL/MCP** instalado (`knowt-gateway` → bridge; ver `docs/HERMES.md`) |
-| Frontend | `knowt/frontend` · temas Fiesta no arranque · fonte Tiny |
+| API / chat URL | https://knowt.com.br (TLS) |
+| Mongo | `127.0.0.1:27017` DB `knowt` · health `mongo_ok` · **sem** espelho Tiny obrigatório (`docs/BANCO.md`) |
+| Hermes home | SPA Insights+Chat · `/api/bridge` · Telegram (`knowt-telegram`) · SOUL/MCP (`docs/HERMES.md`) |
+| Frontend | `knowt/frontend` · fonte Tiny |
 | Firewall Hostinger | grupo `knowt` · Accept 22/80/443 + Drop Any |
-| Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` (copiado de Fiesta `TINY_V2_API_KEY`, 2026-08-08) |
-| Tiny `orders.list` | **live** — contagem por período, situação, **resumo/breakdown** por situação |
-| Tiny `orders.detail` | **live** — situação, cliente, itens, ecommerce, valor Tiny (sem CMV) |
-| Tiny `sales.summary` | ainda `unavailable` — probe ok; gates parciais (falta `approved_to_publish` + `cost_field`≠defer) · recon UI oficial **aligned_sample** (overlap Nº última página API) · `docs/SALES_SUMMARY_PACOTE.md` |
-| Discovery UI Playwright | dossiê consolidado `docs/TINY_DISCOVERY_DOSSIER.md` · `GET /api/bridge/discovery/dossier` · probes system/expand/margin/cost · **gerar** avaliação/contribuição (últimos 7 dias → tabela 100 linhas) |
-| Tiny `margins.summary` | `unavailable` (slot criado; sem publish) |
-| Evidence sales | `/root/knowt-data/evidence/sales_probe_*.json` + `sales_summary_gates.json` |
+| Vault Tiny | `KNOWT_SECRET_TINY_TOKEN` em `/root/knowt/.env` |
+| Tiny `orders.list` / `orders.detail` | **live** |
+| Tiny `sales.summary` / `margins.summary` | `unavailable` até gates · `docs/SALES_SUMMARY_PACOTE.md` |
+| Discovery | dossiê · `GET /discovery/dossier` |
 | Data path | `/root/knowt-data` |
-| API local (systemd) | `knowt-api` · `127.0.0.1:8766` · unit `deploy/knowt-api.service` |
-| Chat answer | `POST /v1/chat/answer` · períodos + situação · Bearer `KNOWT_API_TOKEN` |
-| Contagem período | 1ª+última página Tiny (`page_bounds`) — sem varrer todas as páginas |
-| Agenda / tarefas | JSON local + OAuth Google Calendar/Tasks (scaffold) · `docs/GOOGLE.md` · falta Client ID/Secret no `.env` para ligar |
+| API (systemd) | `knowt-api` · `127.0.0.1:8766` |
+| Agenda / tarefas | local + Google OAuth scaffold · `docs/GOOGLE.md` |
+| Drift / kill / contratos | `docs/DRIFT_KILL_CONTRATOS.md` |
+| Critério piloto | **`docs/PILOTO_TINY_FECHADO.md`** |
 | Audit | `/root/knowt-data/audit/answers.jsonl` |
-| Nginx / TLS | rascunho `deploy/nginx-knowt.example.conf` — ver `docs/DNS.md` |
 
-### Precisa do humano (avisar quando feito)
+### Precisa do humano
 
-Ver `docs/DNS.md`. Em resumo:
-
-1. DNS A knowt → `179.198.118.171`
-2. Firewall Hostinger: Accept **80** + **443**
-3. Mensagem no chat: «DNS feito»
-
-Até lá a API fica só em loopback + Bearer `KNOWT_API_TOKEN`.
-
-### O que enviar ao agente após criar VPS + GitHub
-
-1. URL do repo GitHub (ex. `https://github.com/<org>/knowt`)
-2. IP da VPS + user SSH (ex. `root@x.x.x.x`)
-3. Confirmar se a chave pública `id_ed25519_knowt.pub` já está em `authorized_keys`
-4. Domínio(s) apontados (A/AAAA) para o IP
-5. **Não** enviar password root no chat
+| Item | Estado |
+|---|---|
+| DNS + TLS knowt.com.br | Feito |
+| CMV / `cost_field` + `approved_to_publish` (T10) | **Aguarda dono** — ou decidir «piloto sem receita» |
+| Google OAuth Client ID/Secret | Opcional — não bloqueia green |
+| WhatsApp Meta | Pausado — depois do green |
 
 ## Próximos passos técnicos (ordem)
 
-1. ~~Visão + scaffold repo~~  
-2. ~~Provisionar VPS~~ · ~~bootstrap `/root/knowt`~~ · DNS knowt ainda TBD  
-3. ~~MVP 0 código~~ (vault, sources, discovery stub, enforcement, health) — ver `docs/MVP0.md`  
-4. ~~Tiny `orders.list` live + answer determinístico~~ · ~~períodos pt-BR~~ · ~~systemd `knowt-api`~~ · ~~contagem page_bounds~~ · ~~orders.detail + catálogo no chat~~ · ~~resumo por situação + amostra/ecommerce~~  
-5. ~~Discovery UI Playwright (fatia custos Tiny)~~ · expandir crawl/páginas + discovery API real  
-6. ~~DNS knowt + Nginx/TLS (+ firewall 80/443)~~  
-7. ~~Chat web piloto em knowt.com.br~~ · ~~Telegram bot fino (long poll → bridge)~~ · ~~Hermes SOUL/MCP (`knowt-gateway`)~~ · WhatsApp / hermes-gateway Telegram ainda TBD  
-8. ~~Pacote técnico sales.summary (probe + gates, sem publish)~~ · publish live só após checklist de negócio  
-9. ~~LLM Hermes no Telegram~~ (`KNOWT_ASSISTANT_ENGINE=hermes`) · ~~WhatsApp webhook no bridge~~ · activar com credenciais Meta (`docs/WHATSAPP.md`)  
-10. ~~Google Calendar/Tasks OAuth no bridge~~ · humano: Client ID/Secret + auth-url (`docs/GOOGLE.md`) · depois: repo GitHub remoto · mais fontes · drift/kill-switch  
+1. ~~Infra + MVP + orders live + DNS + chat/Telegram/Hermes~~  
+2. ~~Contratos + kill + drift API~~  
+3. **Agora (só Tiny / green):** ~~T12~~ · ~~T8~~ · **T11/T7/T9** · T10  
+4. **Depois do green:** 2ª fonte · WhatsApp · Google com credenciais  
 
-Telegram: `docs/TELEGRAM.md` · unit `knowt-telegram.service` · exige `KNOWT_TELEGRAM_BOT_TOKEN` no `.env`  
-Hermes: `docs/HERMES.md` · `scripts/configure_hermes_knowt.py` · motor chat Telegram = hermes quando configurado  
-Google: `docs/GOOGLE.md` · sem Client → agenda/tarefas só locais · health `google_connected`
+Telegram: `docs/TELEGRAM.md` · Hermes: `docs/HERMES.md` · Google: `docs/GOOGLE.md` · Drift: `docs/DRIFT_KILL_CONTRATOS.md`
 
 ## Agente
 
-Pode continuar o mesmo agente de desenvolvimento do Fiesta **desde que** trabalhe neste repo e respeite a fronteira. Qualquer sucessor deve conseguir operar **só** com este `HANDOFF.md` + `docs/`.
+Pode continuar o mesmo agente do Fiesta **desde que** trabalhe neste repo e respeite a fronteira. Sucessor opera com este `HANDOFF.md` + `docs/` — prioridade = `docs/PILOTO_TINY_FECHADO.md`.

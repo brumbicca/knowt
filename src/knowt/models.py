@@ -25,10 +25,13 @@ class Source:
     source_id: str
     system: str
     org_id: str = "default"
-    status: str = "draft"
+    status: str = "draft"  # draft | active | suspended
     secret_refs: Dict[str, str] = field(default_factory=dict)
     capabilities: List[Capability] = field(default_factory=list)
     notes: str = ""
+    kill_switch_reason: Optional[str] = None
+    kill_switch_at: Optional[str] = None
+    kill_switch_actor: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
